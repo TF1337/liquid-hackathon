@@ -1,0 +1,20 @@
+# Virtual environments
+venv/
+.venv/
+
+# Environment files
+.env
+
+# Models directory (GGUFs)
+models/
+
+# macOS files
+.DS_Store
+
+# Python cache files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.ipynb_checkpoints/
