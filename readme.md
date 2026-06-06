@@ -102,6 +102,8 @@ uv run huggingface-cli download TheBloke/Llama-2-7B-Chat-GGUF llama-2-7b-chat.Q4
 
 The core inference script is located at `src/infer_vision.py`. It works for both text-only models and vision models, and optionally supports guided JSON schemas.
 
+> Note: The current Python vision path uses `llama-cpp-python` + `LlamaLlavaChatHandler` and should be treated as **experimental** for Liquid LFM2.5-VL Extract until runtime-verified in your environment. The known-good local validation path so far is external `llama-mtmd-cli` testing.
+
 ### 1. Vision Multimodal Inference
 Provide the main model, the multimodal projector, the image path, and a prompt:
 
@@ -124,6 +126,19 @@ uv run src/infer_vision.py \
   --prompt "Analyze the image." \
   --schema '{"type": "object", "properties": {"primary_color": {"type": "string"}, "objects_detected": {"type": "array", "items": {"type": "string"}}}, "required": ["primary_color", "objects_detected"]}'
 ```
+
+You can also pass a schema file path:
+
+```bash
+uv run src/infer_vision.py \
+  --model models/ggml-model-f16.gguf \
+  --mmproj models/mmproj-model-f16.gguf \
+  --image data/samples/sample_image.jpg \
+  --prompt "Extract visible evidence only." \
+  --schema-file schemas/base/minimal_evidence.schema.json
+```
+
+If both `--schema` and `--schema-file` are provided at once, the script exits with an error.
 
 ### 3. Text-only Guided Generation
 For a text-only GGUF model:

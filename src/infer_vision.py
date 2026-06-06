@@ -13,6 +13,56 @@ from src.utils.logger import log_inference, logger
 # Load environment variables
 load_dotenv()
 
+
+def parse_schema_args(schema_inline: str | None, schema_file: str | None) -> dict | None:
+    if schema_inline and schema_file:
+        raise ValueError("Provide either --schema or --schema-file, not both.")
+
+    if schema_inline:
+        try:
+            return json.loads(schema_inline)
+        except json.JSONDecodeError as e:
+            raise ValueError(f"Failed to parse JSON schema string: {e}") from e
+
+    if schema_file:
+        if not os.path.exists(schema_file):
+            raise ValueError(f"Schema file not found: {schema_file}")
+        try:
+            with open(schema_file, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except json.JSONDecodeError as e:
+            raise ValueError(f"Schema file is not valid JSON: {e}") from e
+        except OSError as e:
+            raise ValueError(f"Failed to read schema file: {e}") from e
+
+    return None
+
+
+def validate_output_shape(output_text: str, schema_dict: dict | None) -> None:
+    if not schema_dict:
+        return
+
+    try:
+        parsed = json.loads(output_text)
+    except json.JSONDecodeError as e:
+        raise ValueError(f"Model output is not valid JSON: {e}") from e
+
+    if not isinstance(parsed, dict):
+        raise ValueError("Model output must be a JSON object when schema guidance is enabled.")
+
+    required = schema_dict.get("required", [])
+    if isinstance(required, list):
+        missing = [key for key in required if key not in parsed]
+        if missing:
+            raise ValueError(f"Model output is missing required keys: {missing}")
+
+    properties = schema_dict.get("properties", {})
+    additional_properties = schema_dict.get("additionalProperties", True)
+    if isinstance(properties, dict) and additional_properties is False:
+        unexpected = [key for key in parsed.keys() if key not in properties]
+        if unexpected:
+            raise ValueError(f"Model output contains unexpected keys: {unexpected}")
+
 def main():
     parser = argparse.ArgumentParser(description="Liquid Hackathon: Vision/Text Edge Inference Boilerplate")
     parser.add_argument("--model", type=str, required=True, help="Path to local GGUF model file.")
@@ -20,6 +70,7 @@ def main():
     parser.add_argument("--image", type=str, default="data/samples/sample_image.jpg", help="Path to input image file.")
     parser.add_argument("--prompt", type=str, default="Describe the image in detail.", help="Inference prompt.")
     parser.add_argument("--schema", type=str, default=None, help="JSON string representing the target output JSON schema for guided generation.")
+    parser.add_argument("--schema-file", type=str, default=None, help="Path to JSON schema file for guided generation.")
     parser.add_argument("--max-tokens", type=int, default=512, help="Maximum number of tokens to generate.")
     parser.add_argument("--temp", type=float, default=0.2, help="Temperature for inference sampling.")
     
@@ -51,17 +102,19 @@ def main():
 
     # Parse JSON schema if provided
     response_format = None
-    if args.schema:
-        try:
-            schema_dict = json.loads(args.schema)
-            response_format = {
-                "type": "json_object",
-                "schema": schema_dict
-            }
-            logger.info("Structured JSON schema guided generation enabled.")
-        except json.JSONDecodeError as e:
-            logger.error(f"Failed to parse JSON schema string: {e}")
-            sys.exit(1)
+    schema_dict = None
+    try:
+        schema_dict = parse_schema_args(args.schema, args.schema_file)
+    except ValueError as e:
+        logger.error(str(e))
+        sys.exit(1)
+
+    if schema_dict is not None:
+        response_format = {
+            "type": "json_object",
+            "schema": schema_dict
+        }
+        logger.info("Structured JSON schema guided generation enabled.")
 
     # Initialize llama-cpp-python with Metal support (-1 offloads all layers to Apple Silicon GPU)
     logger.info(f"Loading model: {args.model} with Apple Silicon Metal acceleration enabled...")
@@ -81,6 +134,10 @@ def main():
         chat_handler = None
         if args.mmproj:
             from llama_cpp.llama_chat_format import LlamaLlavaChatHandler
+            # NOTE: This LlamaLlavaChatHandler path is currently experimental for
+            # Liquid LFM2.5-VL Extract models. The known-good validated path so far
+            # is llama-mtmd-cli + mmproj + grammar/schema-constrained output.
+            # Runtime-verify both paths before relying on this in demos.
             logger.info("Initializing Llava Chat Handler with projector...")
             chat_handler = LlamaLlavaChatHandler(clip_model_path=args.mmproj, verbose=False)
             
@@ -160,6 +217,12 @@ def main():
             # llama_cpp prompt/completion token usage is structured as:
             tokens_generated = response["usage"]["completion_tokens"]
 
+    try:
+        validate_output_shape(output_text, schema_dict)
+    except ValueError as e:
+        logger.error(str(e))
+        sys.exit(1)
+
     # Log results
     log_inference(
         latency_sec=latency,
@@ -168,7 +231,7 @@ def main():
         extra_metrics={
             "model_path": args.model,
             "has_vision": args.mmproj is not None,
-            "has_schema": args.schema is not None
+            "has_schema": schema_dict is not None
         }
     )
 
