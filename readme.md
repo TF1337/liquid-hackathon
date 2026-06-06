@@ -184,3 +184,50 @@ The frontend operates in two modes, auto-detected at startup:
 - **Mock** — backend is unreachable. The UI shows static demo data so the dashboard remains browsable offline.
 
 The active mode is shown by a badge in the top-right of the app shell.
+
+---
+
+## License
+
+This project is licensed under the **Apache License 2.0**. See [LICENSE](./LICENSE) for the full text.
+
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+
+---
+
+## Acknowledgements & Sponsors
+
+Built at the **Liquid AI Hackathon Tokyo · June 2026**.
+
+<table>
+  <tr>
+    <td align="center" width="200">
+      <a href="https://www.liquid.ai" target="_blank">
+        <img src="https://avatars.githubusercontent.com/u/138661858?s=200&v=4" width="80" alt="Liquid AI" /><br/>
+        <sub><b>Liquid AI</b></sub>
+      </a><br/>
+      <sub>Model provider · LFM2.5-VL & LFM2.5</sub>
+    </td>
+    <td align="center" width="200">
+      <a href="https://www.amd.com" target="_blank">
+        <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/7/7c/AMD_Logo.svg/320px-AMD_Logo.svg.png" width="100" alt="AMD" /><br/>
+        <sub><b>AMD</b></sub>
+      </a><br/>
+      <sub>Hardware sponsor · Ryzen AI PC</sub>
+    </td>
+    <td align="center" width="200">
+      <a href="https://www.wandb.ai" target="_blank">
+        <img src="https://avatars.githubusercontent.com/u/26401354?s=200&v=4" width="80" alt="Weights & Biases" /><br/>
+        <sub><b>Weights &amp; Biases</b></sub>
+      </a><br/>
+      <sub>Experiment tracking · Weave tracing</sub>
+    </td>
+    <td align="center" width="200">
+      <a href="https://www.wayequitypartners.com" target="_blank">
+        <img src="https://media.licdn.com/dms/image/v2/D560BAQHQiEXSi4FE9g/company-logo_200_200/company-logo_200_200/0/1700467670750/way_equity_partners_logo?e=2147483647&v=beta&t=qkRFGG6K9wHKHfPf8fI_Cs5H-oJVCFHN3FKnuTMxSMY" width="80" alt="WAY Equity Partners" /><br/>
+        <sub><b>WAY Equity Partners</b></sub>
+      </a><br/>
+      <sub>Event co-organizer</sub>
+    </td>
+  </tr>
+</table>
