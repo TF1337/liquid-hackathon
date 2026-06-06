@@ -150,14 +150,14 @@ def run_mtmd_cli(args: argparse.Namespace) -> tuple[str, float, int | None]:
 
     command = [
         mtmd_cli_path,
-        "--model", args.model,
+        "-m", args.model,
         "--mmproj", args.mmproj,
         "--image", args.image,
-        "--prompt", args.prompt,
-        "--n-predict", str(args.max_tokens),
+        "-p", args.prompt,
+        "-n", str(args.max_tokens),
         "--temp", str(args.temp),
         "--repeat-penalty", str(args.repeat_penalty),
-        "--n-gpu-layers", str(args.n_gpu_layers),
+        "-ngl", str(args.n_gpu_layers),
         "--threads", str(args.threads),
     ]
 
@@ -172,7 +172,13 @@ def run_mtmd_cli(args: argparse.Namespace) -> tuple[str, float, int | None]:
 
     logger.info(f"Running mtmd backend via executable: {mtmd_cli_path}")
     start_time = time.perf_counter()
-    result = subprocess.run(command, capture_output=True, text=True)
+    result = subprocess.run(
+        command,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
     latency = time.perf_counter() - start_time
 
     if result.returncode != 0:
