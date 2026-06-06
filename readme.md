@@ -201,6 +201,36 @@ uv run src/infer_vision.py \
 
 ---
 
+## 🧭 Advent One FastAPI Backend Scaffold (Stage C)
+
+The new Advent One backend lives under `src/advent_one/` and runs alongside the existing `src/infer_vision.py` prototype.
+
+- Stage-1 extraction: local `llama-server` vision endpoint (`VL_SERVER_URL`, default `http://localhost:8001`).
+- Stage-2 synthesis: local JP/text endpoint (`JP_SERVER_URL`, default `http://localhost:8002`) with deterministic fallback.
+- `/trigger` is non-blocking state update only.
+- Manual upload (`/extract` with file multipart) remains available and does not depend on ESP32.
+- Existing `mtmd_cli` path remains the fallback/validation harness until llama-server parity is proven.
+
+### Run Advent One backend
+
+```bash
+uv run uvicorn src.advent_one.main:app --host 0.0.0.0 --port 8000
+```
+
+### Run smoke test
+
+```bash
+python scripts/smoke_test.py data/samples/sample_image.jpg
+```
+
+Optional smoke target override:
+
+```bash
+BACKEND_URL=http://localhost:8000 python scripts/smoke_test.py data/samples/sample_image.jpg
+```
+
+---
+
 ## 📊 Logging & Metrics
 
 During execution, metrics are logged locally to the terminal and forwarded to Weights & Biases (if `WANDB_API_KEY` is provided in `.env`). The logger tracks:

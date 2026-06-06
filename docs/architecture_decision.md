@@ -18,7 +18,7 @@
 ### Stage 2 (placeholder/interface for future work)
 
 - Input: aggregated Stage-1 records and optional notes.
-- Output: workflow-level reasoning (risks, bottlenecks, modernization options, plan).
+- Output: grounded workflow observations, repeated manual/paper signals, approval-reference counts, source-linked graph nodes, and fields requiring human review.
 - Current status: intentionally not implemented as product logic in this repo.
 
 ## Why this separation matters

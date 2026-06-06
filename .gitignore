@@ -2,6 +2,9 @@
 venv/
 .venv/
 
+# JetBrains IDE project files
+.idea/
+
 # Environment files
 .env
 .env.*

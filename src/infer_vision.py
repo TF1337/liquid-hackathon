@@ -10,6 +10,7 @@ from dotenv import load_dotenv
 # Ensure we can import from src
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from src.utils.logger import log_inference, logger
+from src.aggregate import aggregate_evidence
 
 # Load environment variables
 load_dotenv()
@@ -149,14 +150,14 @@ def run_mtmd_cli(args: argparse.Namespace) -> tuple[str, float, int | None]:
 
     command = [
         mtmd_cli_path,
-        "--model", args.model,
+        "-m", args.model,
         "--mmproj", args.mmproj,
         "--image", args.image,
-        "--prompt", args.prompt,
-        "--n-predict", str(args.max_tokens),
+        "-p", args.prompt,
+        "-n", str(args.max_tokens),
         "--temp", str(args.temp),
         "--repeat-penalty", str(args.repeat_penalty),
-        "--n-gpu-layers", str(args.n_gpu_layers),
+        "-ngl", str(args.n_gpu_layers),
         "--threads", str(args.threads),
     ]
 
@@ -171,7 +172,13 @@ def run_mtmd_cli(args: argparse.Namespace) -> tuple[str, float, int | None]:
 
     logger.info(f"Running mtmd backend via executable: {mtmd_cli_path}")
     start_time = time.perf_counter()
-    result = subprocess.run(command, capture_output=True, text=True)
+    result = subprocess.run(
+        command,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
     latency = time.perf_counter() - start_time
 
     if result.returncode != 0:
@@ -185,8 +192,9 @@ def run_mtmd_cli(args: argparse.Namespace) -> tuple[str, float, int | None]:
 
 def main():
     parser = argparse.ArgumentParser(description="Liquid Hackathon: Vision/Text Edge Inference Boilerplate")
+    parser.add_argument("--mode", choices=["extract", "aggregate"], default="extract", help="Run extraction inference (default) or deterministic Stage-2 aggregation over existing Stage-1 records.")
     parser.add_argument("--backend", choices=["python_llama_cpp", "mtmd_cli"], default="python_llama_cpp", help="Inference backend. Keep python_llama_cpp for existing behavior; use mtmd_cli for validated Liquid VLM multimodal path.")
-    parser.add_argument("--model", type=str, required=True, help="Path to local GGUF model file.")
+    parser.add_argument("--model", type=str, default=None, help="Path to local GGUF model file.")
     parser.add_argument("--mmproj", type=str, default=None, help="Path to multimodal projector GGUF file (required for LLaVA/vision models).")
     parser.add_argument("--image", type=str, default="data/samples/sample_image.jpg", help="Path to input image file.")
     parser.add_argument("--prompt", type=str, default="Describe the image in detail.", help="Inference prompt.")
@@ -198,11 +206,41 @@ def main():
     parser.add_argument("--temp", type=float, default=0.2, help="Temperature for inference sampling.")
     parser.add_argument("--repeat-penalty", type=float, default=1.1, help="Repeat penalty used for inference (mtmd_cli backend).")
     parser.add_argument("--n-gpu-layers", type=int, default=0, help="Number of layers to offload to GPU. Use 0 for CPU compatibility; test higher values (e.g., 99) on validated Vulkan demo hardware.")
-    parser.add_argument("--threads", type=int, default=max(1, (os.cpu_count() or 4) // 2), help="Number of CPU threads for inference (mtmd_cli backend).")
+    parser.add_argument("--threads", type=int, default=4, help="Number of CPU threads for inference (mtmd_cli backend).")
+    parser.add_argument("--records-file", type=str, default=None, help="Path to a JSON file containing a list of Stage-1 extraction records for --mode aggregate.")
     
     args = parser.parse_args()
 
+    if args.mode == "aggregate":
+        if not args.records_file:
+            logger.error("--records-file is required when --mode aggregate is used.")
+            sys.exit(1)
+        if not os.path.exists(args.records_file):
+            logger.error(f"Records file not found: {args.records_file}")
+            sys.exit(1)
+
+        try:
+            with open(args.records_file, "r", encoding="utf-8") as f:
+                records = json.load(f)
+        except json.JSONDecodeError as e:
+            logger.error(f"Records file is not valid JSON: {e}")
+            sys.exit(1)
+        except OSError as e:
+            logger.error(f"Failed to read records file: {e}")
+            sys.exit(1)
+
+        if not isinstance(records, list):
+            logger.error("Records file JSON must be an array of extraction record objects.")
+            sys.exit(1)
+
+        aggregated = aggregate_evidence(records)
+        print(json.dumps(aggregated, ensure_ascii=False, indent=2))
+        return
+
     # Verify model file exists
+    if not args.model:
+        logger.error("--model is required when --mode extract is used.")
+        sys.exit(1)
     if not os.path.exists(args.model):
         logger.error(f"Model file not found: {args.model}")
         sys.exit(1)
@@ -376,7 +414,11 @@ def main():
 
     # Output response
     print("\n" + "=" * 40 + " MODEL OUTPUT " + "=" * 40)
-    print(output_text)
+    try:
+        parsed_output = json.loads(output_text)
+        print(json.dumps(parsed_output, ensure_ascii=False, indent=2))
+    except json.JSONDecodeError:
+        print(output_text)
     print("=" * 94 + "\n")
 
 if __name__ == "__main__":
