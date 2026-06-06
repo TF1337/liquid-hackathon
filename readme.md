@@ -1,83 +1,186 @@
 # Advent One
 
-On-device M&A acquisition modernization copilot for under-digitized Japanese SMEs. 
-This repository is split into a modular backend and frontend architecture.
+On-device M&A acquisition modernization copilot for under-digitized Japanese SMEs.
+
+Captures physical documents (receipts, invoices, delivery slips, whiteboards) via a local vision model, extracts structured facts using JSON Schema–constrained inference, and synthesizes a grounded observed workflow graph — all without sending data to the cloud.
 
 ---
 
 ## Repository Structure
 
 ```text
-├── backend/            # Python FastAPI service, model servers, and CLI utilities
-│   ├── src/            # Backend API routes, Pydantic schemas, and client wrappers
-│   ├── scripts/        # Orchestration (run_servers.sh) and verification (smoke_test.py) scripts
-│   ├── models/         # Directory to hold local GGUF weights (gitignored)
-│   ├── data/           # Sample datasets and documents
-│   └── pyproject.toml  # Python project definitions (uv)
+├── backend/                  # Python FastAPI service + local model servers
+│   ├── src/
+│   │   ├── advent_one/
+│   │   │   ├── main.py           # FastAPI app & route handlers
+│   │   │   ├── schemas.py        # Pydantic data models (ExtractedFact, WorkflowGraph…)
+│   │   │   ├── llm_client.py     # llama-server HTTP clients (VLClient, JPClient)
+│   │   │   └── extract_schemas.py# YAML extraction schemas (sakura_logistics, government_letter)
+│   │   └── utils/
+│   │       └── logger.py
+│   ├── scripts/
+│   │   ├── run_servers.sh    # Starts llama-server(s) + FastAPI in one command
+│   │   └── smoke_test.py     # End-to-end API smoke test
+│   ├── models/               # GGUF weight files (gitignored — download separately)
+│   ├── data/samples/         # Sample images for testing
+│   ├── .env.example          # Environment variable reference
+│   └── pyproject.toml        # Python dependencies (managed via uv)
 │
-├── frontend/           # TanStack Start client web dashboard
-│   ├── src/            # React components, pages (file-based routes), and assets
-│   ├── package.json    # Frontend script definitions and dependencies (npm)
-│   └── vite.config.ts  # Vite bundler configurations
+├── frontend/                 # TanStack Start (React + Vite) web dashboard
+│   ├── src/
+│   │   ├── routes/
+│   │   │   ├── index.tsx         # Home / status page
+│   │   │   ├── capture.tsx       # Stage 1 — document capture & extraction
+│   │   │   ├── evidence.tsx      # Evidence gallery (all extracted records)
+│   │   │   ├── evidence.$id.tsx  # Single evidence record detail view
+│   │   │   └── workflow.tsx      # Stage 2 — observed workflow graph
+│   │   ├── lib/advent-one/       # Backend API client, types, adapters, React Query hooks
+│   │   ├── components/           # Shared UI components (app-shell, telemetry-strip…)
+│   │   └── mocks/                # Static mock data for demo/offline mode
+│   ├── package.json
+│   └── vite.config.ts
 │
-└── README.md           # Root guide
+└── readme.md
 ```
 
 ---
 
-## Quick Start Guide
+## Prerequisites
 
-### 1. Set Up and Run the Backend
+- **macOS (Apple Silicon recommended)** — GPU offloading via Metal is enabled by default
+- [Homebrew](https://brew.sh) — to install `llama.cpp`
+- [uv](https://github.com/astral-sh/uv) — Python package manager
+- **Node.js ≥ 20** + npm — for the frontend
 
-Navigate to the `backend/` directory:
+Install `llama.cpp` (provides `llama-server`):
+```bash
+brew install llama.cpp
+```
+
+---
+
+## Quick Start
+
+### 1. Backend
+
 ```bash
 cd backend
 ```
 
-#### Download the Liquid AI Models (GGUFs)
-Download the vision extractor and text synthesis models using the Hugging Face CLI:
+#### Copy and configure environment variables
 ```bash
-# Vision Extractor
-uv run huggingface-cli download LiquidAI/LFM2.5-VL-450M-Extract-GGUF LFM2.5-VL-450M-Extract-Q4_0.gguf --local-dir models --local-dir-use-symlinks False
-uv run huggingface-cli download LiquidAI/LFM2.5-VL-450M-Extract-GGUF mmproj-LFM2.5-VL-450M-Extract-F16.gguf --local-dir models --local-dir-use-symlinks False
-
-# Japanese Text Synthesis
-uv run huggingface-cli download LiquidAI/LFM2.5-1.2B-JP-202606-GGUF LFM2.5-1.2B-JP-202606-Q4_0.gguf --local-dir models --local-dir-use-symlinks False
+cp .env.example .env
+# Edit .env if needed (WANDB_API_KEY, FRONTEND_ORIGIN, etc.)
 ```
 
-#### Launch the Backend Stack
-Run the server orchestrator script. This script automatically starts the local `llama-server` instances on ports `8001` and `8002`, waits for them to initialize, and then boots the FastAPI application on port `8000`:
+#### Install Python dependencies
+```bash
+uv sync
+```
+
+#### Download the Liquid AI GGUF models
+
+```bash
+# Vision extractor (required for /extract)
+uv run huggingface-cli download LiquidAI/LFM2.5-VL-450M-Extract-GGUF \
+  LFM2.5-VL-450M-Extract-Q4_0.gguf \
+  --local-dir models --local-dir-use-symlinks False
+
+uv run huggingface-cli download LiquidAI/LFM2.5-VL-450M-Extract-GGUF \
+  mmproj-LFM2.5-VL-450M-Extract-F16.gguf \
+  --local-dir models --local-dir-use-symlinks False
+
+# Japanese text synthesizer (optional — fallback to rule-based synthesis if absent)
+uv run huggingface-cli download LiquidAI/LFM2.5-1.2B-JP-202606-GGUF \
+  LFM2.5-1.2B-JP-202606-Q4_0.gguf \
+  --local-dir models --local-dir-use-symlinks False
+```
+
+#### Launch the full backend stack
 ```bash
 ./scripts/run_servers.sh
 ```
 
-*(Alternatively, to run the FastAPI backend alone using the deterministic fallback without booting model servers, run: `uv run uvicorn src.advent_one.main:app --host 0.0.0.0 --port 8000`)*.
+This script:
+1. Starts `llama-server` for the vision model on **port 8001**
+2. Starts `llama-server` for the JP text model on **port 8002** *(if model file is present)*
+3. Polls health checks until both servers are ready
+4. Boots the FastAPI app via `uvicorn` on **port 8000**
+
+> **Minimal mode (no models):** Run the FastAPI app directly — extraction will return 503 and workflow synthesis falls back to the deterministic rule-based engine:
+> ```bash
+> uv run python -m uvicorn src.advent_one.main:app --host 0.0.0.0 --port 8000
+> ```
 
 ---
 
-### 2. Set Up and Run the Frontend
+### 2. Frontend
 
-In a new terminal window, navigate to the `frontend/` directory:
+In a separate terminal:
+
 ```bash
 cd frontend
-```
-
-#### Install Dependencies
-```bash
 npm install --legacy-peer-deps
-```
-
-#### Start the Dev Server
-Launch the local web server on port `8080`:
-```bash
 npm run dev
 ```
 
+The dev server starts on **`http://localhost:8080`**.
+
 ---
 
-### 3. Verification
+### 3. Verify Everything Works
 
-Once both the backend and frontend are running, open your browser to **`http://localhost:8080/`**. 
+Run the end-to-end smoke test from the `backend/` directory (requires the backend stack to be running):
 
-*   The frontend will automatically probe `http://localhost:8000/health`. 
-*   Once connected, the status badge in the UI will display **Live backend**, and all document extractions and workflow synthesis requests will run through your local models.
+```bash
+uv run python scripts/smoke_test.py data/samples/sample_image.jpg
+```
+
+A successful run prints JSON from `/health`, `/trigger`, `/extract`, `/synthesize`, `/facts`, and `/graph` in sequence.
+
+---
+
+## API Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/health` | VL/JP server status, ingestion state, captured count |
+| `POST` | `/trigger` | Wake the ingestion state machine |
+| `POST` | `/extract` | Upload an image → extract structured `ExtractedFact` |
+| `POST` | `/synthesize` | Aggregate all facts → produce `WorkflowGraph` |
+| `GET` | `/facts` | List all extracted facts in session |
+| `GET` | `/graph` | Retrieve the last synthesized workflow graph |
+| `GET` | `/state` | Current ingestion state |
+| `POST` | `/reset` | Clear all facts and graph, reset to SLEEP |
+
+---
+
+## Environment Variables (`backend/.env`)
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `VL_SERVER_URL` | `http://localhost:8001` | Vision llama-server URL |
+| `JP_SERVER_URL` | `http://localhost:8002` | Japanese text llama-server URL |
+| `VL_MODEL_ID` | `lfm2.5-vl-extract` | Model ID sent in VL completions request |
+| `JP_MODEL_ID` | `lfm2.5-1.2b-jp` | Model ID sent in JP completions request |
+| `ACTIVE_SCHEMA` | `sakura_logistics` | Default extraction schema (`sakura_logistics` or `government_letter`) |
+| `FRONTEND_ORIGIN` | `*` | CORS allowed origin (set to `http://localhost:8080` in production) |
+| `WANDB_API_KEY` | *(empty)* | Optional W&B / Weave tracing key |
+| `WEAVE_PROJECT` | `advent-one` | Weave project name |
+
+The frontend reads one optional variable (in `frontend/.env.local`):
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `VITE_ADVENT_ONE_URL` | `http://localhost:8000` | Backend base URL |
+
+---
+
+## Data Source Modes
+
+The frontend operates in two modes, auto-detected at startup:
+
+- **Live** — backend is reachable at `VITE_ADVENT_ONE_URL`. All captures and synthesis run through local models.
+- **Mock** — backend is unreachable. The UI shows static demo data so the dashboard remains browsable offline.
+
+The active mode is shown by a badge in the top-right of the app shell.
