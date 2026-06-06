@@ -204,7 +204,8 @@ def main():
     parser.add_argument("--mtmd-cli-path", type=str, default=None, help="Path to llama-mtmd-cli executable. Can also be set via MTMD_CLI_PATH.")
     parser.add_argument("--max-tokens", type=int, default=512, help="Maximum number of tokens to generate.")
     parser.add_argument("--temp", type=float, default=0.2, help="Temperature for inference sampling.")
-    parser.add_argument("--repeat-penalty", type=float, default=1.1, help="Repeat penalty used for inference (mtmd_cli backend).")
+    parser.add_argument("--repeat-penalty", type=float, default=1.1, help="Repeat penalty used for inference.")
+    parser.add_argument("--min-p", type=float, default=0.15, help="Min-p parameter for sampling (python backend).")
     parser.add_argument("--n-gpu-layers", type=int, default=0, help="Number of layers to offload to GPU. Use 0 for CPU compatibility; test higher values (e.g., 99) on validated Vulkan demo hardware.")
     parser.add_argument("--threads", type=int, default=4, help="Number of CPU threads for inference (mtmd_cli backend).")
     parser.add_argument("--records-file", type=str, default=None, help="Path to a JSON file containing a list of Stage-1 extraction records for --mode aggregate.")
@@ -297,24 +298,32 @@ def main():
         try:
             from llama_cpp import Llama
 
-            # Initialize Llama model
-            llm = Llama(
-                model_path=args.model,
-                n_gpu_layers=args.n_gpu_layers,
-                n_ctx=2048,
-                verbose=False
-            )
-
             # Setup Multimodal chat handler if vision projector is passed
             chat_handler = None
             if args.mmproj:
-                from llama_cpp.llama_chat_format import LlamaLlavaChatHandler
+                try:
+                    from llama_cpp.llama_chat_format import Llava15ChatHandler as LlamaLlavaChatHandler
+                except ImportError:
+                    try:
+                        from llama_cpp.llama_chat_format import LlamaLlavaChatHandler
+                    except ImportError:
+                        raise ImportError("Could not import Llava15ChatHandler or LlamaLlavaChatHandler from llama_cpp.llama_chat_format")
+                
                 # NOTE: This LlamaLlavaChatHandler path is currently experimental for
                 # Liquid LFM2.5-VL Extract models. The known-good validated path so far
                 # is llama-mtmd-cli + mmproj + grammar-constrained output.
                 # Runtime-verify both paths before relying on this in demos.
                 logger.info("Initializing Llava Chat Handler with projector...")
                 chat_handler = LlamaLlavaChatHandler(clip_model_path=args.mmproj, verbose=False)
+
+            # Initialize Llama model
+            llm = Llama(
+                model_path=args.model,
+                n_gpu_layers=args.n_gpu_layers,
+                n_ctx=2048,
+                chat_handler=chat_handler,
+                verbose=False
+            )
 
         except ImportError as e:
             logger.error(f"llama-cpp-python or required components not installed correctly: {e}")
@@ -353,9 +362,10 @@ def main():
             # Note: Guided generation is usually passed to create_chat_completion via response_format
             response = llm.create_chat_completion(
                 messages=messages,
-                chat_handler=chat_handler,
                 max_tokens=args.max_tokens,
                 temperature=args.temp,
+                repeat_penalty=args.repeat_penalty,
+                min_p=args.min_p,
                 response_format=response_format
             )
             latency = time.perf_counter() - start_time
@@ -375,6 +385,8 @@ def main():
                     messages=[{"role": "user", "content": args.prompt}],
                     max_tokens=args.max_tokens,
                     temperature=args.temp,
+                    repeat_penalty=args.repeat_penalty,
+                    min_p=args.min_p,
                     response_format=response_format
                 )
                 latency = time.perf_counter() - start_time
@@ -385,6 +397,8 @@ def main():
                     prompt=f"User: {args.prompt}\nAssistant:",
                     max_tokens=args.max_tokens,
                     temperature=args.temp,
+                    repeat_penalty=args.repeat_penalty,
+                    min_p=args.min_p,
                     stop=["User:", "\n"]
                 )
                 latency = time.perf_counter() - start_time

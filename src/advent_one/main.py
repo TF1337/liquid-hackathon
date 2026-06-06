@@ -1,5 +1,7 @@
 import os
 import time
+import json
+from src.utils.logger import logger
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from typing import Any
@@ -58,15 +60,11 @@ def _fact_text(fact: ExtractedFact) -> str:
 
 
 def _deterministic_synthesis(facts: list[ExtractedFact]) -> WorkflowGraph:
-    manual_keywords = ["FAX", "手書き", "電話", "紙", "whiteboard", "manual", "approval", "paper", "承認"]
     owner_keywords = ["社長", "オーナー", "owner", "president"]
-    approval_keywords = ["承認", "approval"]
-
+    
     nodes: list[WorkflowNode] = []
     edges: list[WorkflowEdge] = []
-    observed_manual_or_paper_signals: list[str] = []
-    approval_reference_count = 0
-    owner_or_president_mentions = 0
+    has_bottleneck = False
 
     for i, fact in enumerate(facts):
         fact_id = fact.id or f"fact-{i + 1}"
@@ -74,15 +72,11 @@ def _deterministic_synthesis(facts: list[ExtractedFact]) -> WorkflowGraph:
         text_blob = _fact_text(fact)
         lowered = text_blob.lower()
 
-        observed_signals: list[str] = []
-        for keyword in manual_keywords:
-            if keyword.lower() in lowered and keyword not in observed_signals:
-                observed_signals.append(keyword)
-            if keyword.lower() in lowered and keyword not in observed_manual_or_paper_signals:
-                observed_manual_or_paper_signals.append(keyword)
-
-        approval_reference_count += sum(1 for kw in approval_keywords if kw.lower() in lowered)
-        owner_or_president_mentions += sum(1 for kw in owner_keywords if kw.lower() in lowered)
+        # Check for owner/founder dependency
+        is_founder_dep = any(kw.lower() in lowered for kw in owner_keywords)
+        is_bottleneck = is_founder_dep  # For this simple rules engine, bottleneck = founder dependent
+        if is_bottleneck:
+            has_bottleneck = True
 
         nodes.append(
             WorkflowNode(
@@ -90,23 +84,28 @@ def _deterministic_synthesis(facts: list[ExtractedFact]) -> WorkflowGraph:
                 label_jp=fact.summary_jp or fact.document_type,
                 label_en=fact.document_type,
                 node_type="step",
-                observed_signals=observed_signals,
+                bottleneck=is_bottleneck,
+                founder_dependent=is_founder_dep,
                 source_fact_ids=[fact_id],
-                requires_human_review=bool(observed_signals),
             )
         )
 
         if i > 0:
             edges.append(WorkflowEdge(source=f"node-{i}", target=node_id, label="sequence"))
 
+    # Construct safe, grounded bottleneck summaries
+    if has_bottleneck:
+        bottleneck_jp = "口頭承認や社長判断への依存が観察され、ワークフローが一時停止する可能性があります。"
+        bottleneck_en = "Dependence on owner/founder approval observed; workflow halts when owner is out."
+    else:
+        bottleneck_jp = "明示的な社長承認への依存は観察されませんでした。"
+        bottleneck_en = "No explicit dependence on owner/founder approval observed."
+
     return WorkflowGraph(
         nodes=nodes,
         edges=edges,
-        observed_manual_or_paper_signals=observed_manual_or_paper_signals,
-        approval_reference_count=approval_reference_count,
-        owner_or_president_mentions=owner_or_president_mentions,
-        workflow_observations_jp="抽出済み事実に基づく観測結果のみを表示しています。",
-        workflow_observations_en="Only evidence-grounded workflow observations are shown.",
+        bottleneck_summary_jp=bottleneck_jp,
+        bottleneck_summary_en=bottleneck_en,
     )
 
 
@@ -125,6 +124,7 @@ async def extract_document(image_bytes: bytes, schema_name: str) -> ExtractedFac
 
 
 async def synthesize_workflow(facts: list[ExtractedFact]) -> WorkflowGraph:
+    # First get the deterministic fallback
     graph = _deterministic_synthesis(facts)
 
     if JP_CLIENT is None:
@@ -132,41 +132,55 @@ async def synthesize_workflow(facts: list[ExtractedFact]) -> WorkflowGraph:
 
     try:
         facts_payload = [fact.model_dump(mode="json") for fact in facts]
+        system_content = (
+            "You are an operations analyst reconstructing a Japanese SME's undocumented workflow from physical document fragments.\n"
+            "Produce a JSON object representing the workflow graph. The JSON must follow this structure:\n"
+            "{\n"
+            "  \"nodes\": [\n"
+            "    {\n"
+            "      \"id\": \"node-1\",\n"
+            "      \"label_jp\": \"社長の承認\",\n"
+            "      \"label_en\": \"President Approval\",\n"
+            "      \"role\": \"社長\",\n"
+            "      \"node_type\": \"step\",\n"
+            "      \"bottleneck\": true,\n"
+            "      \"founder_dependent\": true,\n"
+            "      \"source_fact_ids\": [\"fact-1\"]\n"
+            "    }\n"
+            "  ],\n"
+            "  \"edges\": [\n"
+            "    {\n"
+            "      \"source\": \"node-1\",\n"
+            "      \"target\": \"node-2\",\n"
+            "      \"label\": \"sequence\"\n"
+            "    }\n"
+            "  ],\n"
+            "  \"bottleneck_summary_jp\": \"summary in Japanese\",\n"
+            "  \"bottleneck_summary_en\": \"summary in English\"\n"
+            "}\n\n"
+            "CRITICAL: Set founder_dependent=true and bottleneck=true on any step requiring the 社長 (president) or オーナー (owner) personally.\n"
+            "Return ONLY the raw JSON object."
+        )
+        
+        user_content = (
+            "Given these extracted facts, reconstruct the workflow.\n\n"
+            f"FACTS:\n{json.dumps(facts_payload, ensure_ascii=False)}"
+        )
+        
         messages = [
-            {
-                "role": "system",
-                "content": (
-                    "You reconstruct workflow observations from extracted facts. "
-                    "Do not infer acquisition risk, ROI, modernization plans, founder dependency, "
-                    "or final business judgments. Use only evidence-grounded observations with source fact IDs."
-                ),
-            },
-            {
-                "role": "user",
-                "content": (
-                    "Given these extracted facts, produce JSON with fields: "
-                    "workflow_observations_jp, workflow_observations_en, observed_manual_or_paper_signals, "
-                    "approval_reference_count, owner_or_president_mentions.\n"
-                    f"facts={facts_payload}"
-                ),
-            },
+            {"role": "system", "content": system_content},
+            {"role": "user", "content": user_content}
         ]
-        jp_result = await JP_CLIENT.chat_json(messages=messages, max_tokens=1024)
+        
+        jp_result = await JP_CLIENT.chat_json(messages=messages, max_tokens=2048)
+        
+        # Validate model output structure using WorkflowGraph
+        validated_graph = WorkflowGraph.model_validate(jp_result)
+        return validated_graph
 
-        if isinstance(jp_result.get("workflow_observations_jp"), str):
-            graph.workflow_observations_jp = jp_result["workflow_observations_jp"]
-        if isinstance(jp_result.get("workflow_observations_en"), str):
-            graph.workflow_observations_en = jp_result["workflow_observations_en"]
-        if isinstance(jp_result.get("observed_manual_or_paper_signals"), list):
-            graph.observed_manual_or_paper_signals = [str(x) for x in jp_result["observed_manual_or_paper_signals"]]
-        if isinstance(jp_result.get("approval_reference_count"), int):
-            graph.approval_reference_count = jp_result["approval_reference_count"]
-        if isinstance(jp_result.get("owner_or_president_mentions"), int):
-            graph.owner_or_president_mentions = jp_result["owner_or_president_mentions"]
-    except Exception:
+    except Exception as e:
+        logger.warning(f"AI synthesis failed: {e}. Falling back to deterministic synthesis.")
         return graph
-
-    return graph
 
 
 @asynccontextmanager
