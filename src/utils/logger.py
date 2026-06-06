@@ -1,10 +1,14 @@
 import os
 import time
 import logging
-import resource
 import platform
 from typing import Optional, Any, Dict
 from dotenv import load_dotenv
+
+try:
+    import resource
+except ImportError:
+    resource = None
 
 # Load env variables from .env
 load_dotenv()
@@ -38,12 +42,13 @@ except Exception as e:
 
 def get_system_metrics() -> Dict[str, Any]:
     """Retrieves basic system resource usage metrics."""
-    # Memory usage on macOS (maxrss is in bytes)
-    max_rss_bytes = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
-    max_rss_mb = max_rss_bytes / (1024 * 1024)
-    
+    max_rss_mb: float | None = None
+    if resource is not None:
+        max_rss_bytes = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+        max_rss_mb = max_rss_bytes / (1024 * 1024)
+
     return {
-        "max_rss_mb": round(max_rss_mb, 2),
+        "max_rss_mb": round(max_rss_mb, 2) if max_rss_mb is not None else None,
         "timestamp": time.time()
     }
 
@@ -78,7 +83,10 @@ def log_inference(
     log_msg = f"Inference Complete | Latency: {latency_sec:.4f}s"
     if tokens_per_sec:
         log_msg += f" | {tokens_per_sec:.2f} tok/s"
-    log_msg += f" | Mem: {metrics['max_rss_mb']} MB"
+    if metrics["max_rss_mb"] is not None:
+        log_msg += f" | Mem: {metrics['max_rss_mb']} MB"
+    else:
+        log_msg += " | Mem: unavailable"
     logger.info(log_msg)
     logger.info(f"Prompt content: {prompt[:100]}...")
 
