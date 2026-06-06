@@ -1,17 +1,17 @@
 # 🌋 Liquid AI Edge Boilerplate
 
-A premium, universal edge-inference skeleton optimized for running Liquid Foundation Models (LFM) and other GGUF-based local vision/text models on Apple Silicon macOS. 
+Cross-platform edge-inference skeleton for local Liquid Foundation Models (LFM) and GGUF-based multimodal/text workflows.
 
-This repository serves as a boilerplate for the **Liquid AI Hackathon**, designed to get edge vision and text inference running with full Metal GPU acceleration and Weights & Biases logging in seconds.
+This repository is built for the **Liquid AI Hackathon** and keeps Stage-1 extraction reusable across evolving product directions.
 
 ---
 
 ## ⚡ Key Features
 
-- **Apple Silicon Metal Optimization**: Built specifically for M1/M2/M3/M4 macOS devices using Metal acceleration (`n_gpu_layers=-1` to offload all computations to GPU).
+- **Validated Liquid VLM Demo Path**: `llama-mtmd-cli` backend for Stage-1 multimodal extraction with Liquid LFM2.5-VL Extract + `mmproj`.
 - **Weights & Biases (W&B) Logging**: Integrated system to monitor latency, tokens per second, memory consumption (RSS usage), and prompt performance.
-- **Multimodal (Vision + Text) Support**: Support for local vision models (such as LLaVA) via GGUF text files and clip multimodal projectors.
-- **Structured Schema Guided Generation**: Ability to pass custom JSON schemas to force structured output from models.
+- **Multimodal + Text Support**: Keeps existing `llama-cpp-python` path and adds `mtmd_cli` backend path.
+- **Deterministic Structured Output Option**: `--grammar-file` support for `mtmd_cli` path and schema support for Python path.
 - **Environment Management with UV**: Utilizes astral's ultra-fast python package manager `uv` to ensure consistency and speed.
 
 ---
@@ -29,17 +29,20 @@ uv --version
 source .venv/bin/activate
 ```
 
-### 2. Install Dependencies (Metal GPU Accelerated)
-To compile `llama-cpp-python` with Metal GPU support on macOS, execute the following command:
+### 2. Install Dependencies
+Sync dependencies:
+
+```bash
+uv sync
+```
+
+Optional: if you use the experimental Python vision path on macOS with Metal, compile `llama-cpp-python` with Metal support:
 
 ```bash
 CMAKE_ARGS="-DGGML_METAL=on" uv pip install llama-cpp-python --no-binary llama-cpp-python --force-reinstall --no-cache-dir
 ```
 
-All other standard dependencies (like `wandb`, `pillow`, `python-dotenv`, `huggingface_hub`) are already defined in the `pyproject.toml` and installed. You can synchronize them via:
-```bash
-uv sync
-```
+For AMD/Windows demo path, prefer `--backend mtmd_cli` and your installed `llama-mtmd-cli` binary.
 
 ### 3. Environment Variables Config
 Create a copy of `.env.example` as `.env` and fill in your API keys:
@@ -100,26 +103,70 @@ uv run huggingface-cli download TheBloke/Llama-2-7B-Chat-GGUF llama-2-7b-chat.Q4
 
 ## 🏃 Running Inference
 
-The core inference script is located at `src/infer_vision.py`. It works for both text-only models and vision models, and optionally supports guided JSON schemas.
+The core inference script is located at `src/infer_vision.py`.
 
-> Note: The current Python vision path uses `llama-cpp-python` + `LlamaLlavaChatHandler` and should be treated as **experimental** for Liquid LFM2.5-VL Extract until runtime-verified in your environment. The known-good local validation path so far is external `llama-mtmd-cli` testing.
+> Notes:
+> - `--backend mtmd_cli` is the validated Liquid LFM2.5-VL multimodal path and recommended for AMD demo runs.
+> - `--backend python_llama_cpp` (with `LlamaLlavaChatHandler`) remains experimental for Liquid LFM2.5-VL until runtime-tested on target hardware.
+> - `--schema` / `--schema-file` apply to the Python backend.
+> - `--grammar-file` applies to `mtmd_cli` and is recommended for deterministic structured JSON output.
 
-### 1. Vision Multimodal Inference
-Provide the main model, the multimodal projector, the image path, and a prompt:
+### 1. Validated Stage-1 Multimodal Extraction (`mtmd_cli` backend)
+
+Windows CMD:
+
+```cmd
+uv run src/infer_vision.py ^
+--backend mtmd_cli ^
+--mtmd-cli-path "%USERPROFILE%\tools\llama\llama-mtmd-cli.exe" ^
+--model "%USERPROFILE%\models\lfm25-vl-450m-extract-clean\LFM2.5-VL-450M-Extract-Q4_0.gguf" ^
+--mmproj "%USERPROFILE%\models\lfm25-vl-450m-extract-clean\mmproj-LFM2.5-VL-450M-Extract-F16.gguf" ^
+--image "%USERPROFILE%\test.png" ^
+--grammar-file "%USERPROFILE%\coldchain.gbnf" ^
+--prompt "Extract visible information into the required JSON schema. Use empty strings for fields not visible." ^
+--max-tokens 180 ^
+--temp 0 ^
+--repeat-penalty 1.1 ^
+--n-gpu-layers 0 ^
+--threads 4
+```
+
+macOS/Linux shell:
 
 ```bash
 uv run src/infer_vision.py \
+--backend mtmd_cli \
+--mtmd-cli-path "$HOME/tools/llama/llama-mtmd-cli" \
+--model "$HOME/models/lfm25-vl-450m-extract-clean/LFM2.5-VL-450M-Extract-Q4_0.gguf" \
+--mmproj "$HOME/models/lfm25-vl-450m-extract-clean/mmproj-LFM2.5-VL-450M-Extract-F16.gguf" \
+--image "$HOME/test.png" \
+--grammar-file "$HOME/coldchain.gbnf" \
+--prompt "Extract visible information into the required JSON schema. Use empty strings for fields not visible." \
+--max-tokens 180 \
+--temp 0 \
+--repeat-penalty 1.1 \
+--n-gpu-layers 0 \
+--threads 4
+```
+
+For AMD/Vulkan demo machines, after validation, you can try `--n-gpu-layers 99`. Keep a CPU fallback command (`--n-gpu-layers 0`) ready.
+
+### 2. Existing Python Path (experimental for Liquid VL)
+
+```bash
+uv run src/infer_vision.py \
+  --backend python_llama_cpp \
   --model models/ggml-model-f16.gguf \
   --mmproj models/mmproj-model-f16.gguf \
   --image data/samples/sample_image.jpg \
   --prompt "Describe the colors and structure of this image."
 ```
 
-### 2. Structured Vision / JSON Schema Guided Generation
-Force the model to output a strictly formatted JSON structure (guided generation) by passing a JSON schema string:
+### 3. Python Backend Structured JSON Schema Guidance
 
 ```bash
 uv run src/infer_vision.py \
+  --backend python_llama_cpp \
   --model models/ggml-model-f16.gguf \
   --mmproj models/mmproj-model-f16.gguf \
   --image data/samples/sample_image.jpg \
@@ -131,6 +178,7 @@ You can also pass a schema file path:
 
 ```bash
 uv run src/infer_vision.py \
+  --backend python_llama_cpp \
   --model models/ggml-model-f16.gguf \
   --mmproj models/mmproj-model-f16.gguf \
   --image data/samples/sample_image.jpg \
@@ -140,11 +188,12 @@ uv run src/infer_vision.py \
 
 If both `--schema` and `--schema-file` are provided at once, the script exits with an error.
 
-### 3. Text-only Guided Generation
+### 4. Text-only Guided Generation
 For a text-only GGUF model:
 
 ```bash
 uv run src/infer_vision.py \
+  --backend python_llama_cpp \
   --model models/llama-2-7b-chat.Q4_K_M.gguf \
   --prompt "Generate a name and tagline for a startup building Apple Silicon AI developer tools." \
   --schema '{"type": "object", "properties": {"startup_name": {"type": "string"}, "tagline": {"type": "string"}}, "required": ["startup_name", "tagline"]}'

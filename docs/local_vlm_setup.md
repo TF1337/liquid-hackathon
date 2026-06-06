@@ -26,9 +26,21 @@ Do not commit these files.
 ## Runtime path notes
 
 - `llama-mtmd-cli` has been locally validated externally for Liquid LFM2.5-VL Extract + `mmproj` + grammar-constrained JSON.
+- For the hackathon demo on AMD Ryzen AI PC, prefer `--backend mtmd_cli` as the Stage-1 extraction path.
 - The current Python path in this repo (`llama-cpp-python` + `LlamaLlavaChatHandler`) should be treated as experimental for Liquid LFM2.5-VL Extract until runtime-tested on your target environment.
 - Do not treat code inspection as compatibility proof for Liquid LFM2.5-VL; compatibility must be established by runtime test.
-- Before demo usage, run the same image/prompt/schema through both paths and compare output validity/stability.
+- Before demo usage, run the same image/prompt/grammar through both paths and compare output validity/stability.
+
+## Structured output source of truth
+
+- `--grammar-file` is the structured-output control for `--backend mtmd_cli`.
+- `--schema` / `--schema-file` remain available for the experimental Python backend.
+- To avoid schema/grammar drift during demo prep, treat the mtmd `.gbnf` grammar as the primary structured-output contract for Stage 1.
+
+## Performance/offload notes
+
+- Start with `--n-gpu-layers 0` for local CPU-compatible tests.
+- On validated AMD/Vulkan demo machines, test `--n-gpu-layers 99` (or another validated value) only after confirming model loading succeeds.
 
 ## What remains untested
 
@@ -40,4 +52,10 @@ Do not commit these files.
 
 ```powershell
 uv run src/infer_vision.py --model models\your-model.gguf --mmproj models\your-mmproj.gguf --image data\samples\sample_image.jpg --prompt "Extract visible evidence only." --schema-file schemas\base\minimal_evidence.schema.json
+```
+
+## Minimal mtmd grammar-constrained run
+
+```powershell
+uv run src/infer_vision.py --backend mtmd_cli --mtmd-cli-path "$env:USERPROFILE\tools\llama\llama-mtmd-cli.exe" --model "$env:USERPROFILE\models\lfm25-vl-450m-extract-clean\LFM2.5-VL-450M-Extract-Q4_0.gguf" --mmproj "$env:USERPROFILE\models\lfm25-vl-450m-extract-clean\mmproj-LFM2.5-VL-450M-Extract-F16.gguf" --image "$env:USERPROFILE\test.png" --grammar-file "$env:USERPROFILE\coldchain.gbnf" --prompt "Extract visible information into the required JSON schema. Use empty strings for fields not visible." --max-tokens 180 --temp 0 --repeat-penalty 1.1 --n-gpu-layers 0 --threads 4
 ```
