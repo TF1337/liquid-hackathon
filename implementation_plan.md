@@ -1,4 +1,4 @@
-# RollupOS Implementation Plan (Corrected)
+# Advent One Implementation Plan (Corrected)
 
 ## Scope of this plan
 

@@ -19,9 +19,11 @@ properties:
   actions:
     type: string
   date:
-    type: string
+    description: visible date string if present, null if absent
+    type: [string, "null"]
   amount:
-    type: string
+    description: visible monetary value or quantity string if present, null if absent
+    type: [string, "null"]
   counterparties:
     type: array
     items:
@@ -54,9 +56,11 @@ properties:
   actions:
     type: string
   date:
-    type: string
+    description: visible date string if present, null if absent
+    type: [string, "null"]
   amount:
-    type: string
+    description: visible monetary value or quantity string if present, null if absent
+    type: [string, "null"]
   counterparties:
     type: array
     items:

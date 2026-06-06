@@ -1,8 +1,8 @@
-# RollupOS Project Specifications
+# Advent One Project Specifications
 
 ## 1) Product Intent
 
-RollupOS is an on-device acquisition modernization copilot for under-digitized Japanese SMEs.
+Advent One is an on-device acquisition modernization copilot for under-digitized Japanese SMEs.
 
 - Demo target scenario: a fake acquisition target such as **Sakura Logistics**.
 - Input evidence examples: invoices, receipts, SOPs, handwritten notes, whiteboards, workflow diagrams, warehouse boards, delivery slips, and temperature logs.
@@ -77,7 +77,7 @@ This specification keeps the product vertical-flexible and does not hard-code a 
 
 ## 6) Product Story Constraints and Claims
 
-- Keep RollupOS naming and local edge/privacy story.
+- Keep Advent One naming and local edge/privacy story.
 - Keep Next.js / React Flow frontend direction.
 - Keep FastAPI backend direction.
 - Keep W&B Weave tracing direction.

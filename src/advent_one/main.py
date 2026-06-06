@@ -180,10 +180,13 @@ async def lifespan(_: FastAPI):
 
 app = FastAPI(title="Advent One Backend", version="0.1.0", lifespan=lifespan)
 
+frontend_origin = os.getenv("FRONTEND_ORIGIN", "*")
+allow_credentials = frontend_origin != "*"
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[os.getenv("FRONTEND_ORIGIN", "*")],
-    allow_credentials=True,
+    allow_origins=[frontend_origin],
+    allow_credentials=allow_credentials,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -214,6 +217,8 @@ async def extract(file: UploadFile = File(...), schema: str = Query(default=os.g
     INGESTION_STATE.status = "PROCESSING"
     start = time.perf_counter()
     try:
+        get_schema(schema)
+
         if VL_CLIENT is None:
             raise HTTPException(status_code=503, detail="VL server client is not initialized.")
 
@@ -242,6 +247,9 @@ async def extract(file: UploadFile = File(...), schema: str = Query(default=os.g
     except RuntimeError as e:
         INGESTION_STATE.status = "AWAKE"
         raise HTTPException(status_code=503, detail=f"Extraction backend unavailable: {e}") from e
+    except ValueError as e:
+        INGESTION_STATE.status = "AWAKE"
+        raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:
         INGESTION_STATE.status = "AWAKE"
         raise HTTPException(status_code=500, detail=f"Extraction failed: {e}") from e
