@@ -1,5 +1,6 @@
 {
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://local.liquid-hackathon/schemas/minimal_evidence.schema.json",
   "type": "object",
   "additionalProperties": false,
   "required": [
