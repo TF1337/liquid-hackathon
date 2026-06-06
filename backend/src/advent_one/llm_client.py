@@ -3,12 +3,13 @@ import json
 import os
 
 import httpx
+import yaml
 
 
 CANONICAL_SAMPLING = {
     "temperature": 0.3,
     "min_p": 0.15,
-    "repetition_penalty": 1.05,
+    "repeat_penalty": 1.05,
 }
 
 
@@ -54,13 +55,12 @@ class VLClient:
 
     async def extract(self, image_bytes: bytes, yaml_schema: str) -> dict:
         encoded_image = base64.b64encode(image_bytes).decode("utf-8")
+        schema_dict = yaml.safe_load(yaml_schema)
         messages = [
             {
                 "role": "system",
                 "content": (
-                    "You are a strict extraction assistant. Return only grounded JSON matching this YAML schema.\n"
-                    "Do not infer business conclusions.\n\n"
-                    f"{yaml_schema}"
+                    "You are a strict document extraction assistant. Extract visibly present information into the requested JSON schema. Do not infer business conclusions."
                 ),
             },
             {
@@ -68,7 +68,7 @@ class VLClient:
                 "content": [
                     {
                         "type": "text",
-                        "text": "Extract only visibly present information into JSON.",
+                        "text": "Extract the visible facts from the image into the JSON schema.",
                     },
                     {
                         "type": "image_url",
@@ -84,7 +84,10 @@ class VLClient:
             "model": self.model_id,
             "messages": messages,
             "max_tokens": 1024,
-            "response_format": {"type": "json_object"},
+            "response_format": {
+                "type": "json_object",
+                "schema": schema_dict,
+            },
             **CANONICAL_SAMPLING,
         }
 

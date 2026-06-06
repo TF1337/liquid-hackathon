@@ -93,4 +93,4 @@ poll_health "JP Server" "$JP_PORT" "$JP_PID"
 
 # 4. Launch FastAPI app
 echo "🚀 Booting FastAPI web service on port $API_PORT..."
-uv run uvicorn src.advent_one.main:app --host 0.0.0.0 --port "$API_PORT" --reload
+uv run python -m uvicorn src.advent_one.main:app --host 0.0.0.0 --port "$API_PORT" --reload

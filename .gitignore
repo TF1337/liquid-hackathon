@@ -1,6 +1,8 @@
 # Virtual environments
 venv/
 .venv/
+backend/venv/
+backend/.venv/
 
 # JetBrains IDE project files
 .idea/
@@ -8,9 +10,11 @@ venv/
 # Environment files
 .env
 .env.*
+backend/.env
+backend/.env.*
 
 # Models directory (GGUFs)
-models/
+backend/models/
 *.gguf
 *.bin
 *.safetensors
@@ -35,10 +39,20 @@ __pycache__/
 
 # Logs and generated artifacts
 *.log
+backend/logs/
 outputs/
 artifacts/
 run_logs/
-logs/
 
 # Weights & Biases
+backend/wandb/
 wandb/
+
+# Frontend dependencies and builds
+frontend/node_modules/
+frontend/dist/
+frontend/dist-ssr/
+frontend/.output/
+frontend/.vinxi/
+frontend/.tanstack/
+frontend/.nitro/
