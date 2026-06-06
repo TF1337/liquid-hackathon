@@ -1,4 +1,4 @@
-# 🌋 Liquid AI Edge Boilerplate
+# Liquid AI Edge Boilerplate
 
 Cross-platform edge-inference skeleton for local Liquid Foundation Models (LFM) and GGUF-based multimodal/text workflows.
 
@@ -6,7 +6,7 @@ This repository is built for the **Liquid AI Hackathon** and keeps Stage-1 extra
 
 ---
 
-## ⚡ Key Features
+## Key Features
 
 - **Validated Liquid VLM Demo Path**: `llama-mtmd-cli` backend for Stage-1 multimodal extraction with Liquid LFM2.5-VL Extract + `mmproj`.
 - **Weights & Biases (W&B) Logging**: Integrated system to monitor latency, tokens per second, memory consumption (RSS usage), and prompt performance.
@@ -16,7 +16,7 @@ This repository is built for the **Liquid AI Hackathon** and keeps Stage-1 extra
 
 ---
 
-## 🚀 Environment Setup
+## Environment Setup
 
 ### 1. Initialize & Activate Virtual Environment
 Use `uv` to activate and run in the local virtual environment:
@@ -58,7 +58,7 @@ HF_TOKEN=your_hugging_face_token_here
 
 ---
 
-## 📦 Directory Structure
+## Directory Structure
 
 ```text
 ├── data/
@@ -78,30 +78,32 @@ HF_TOKEN=your_hugging_face_token_here
 
 ---
 
-## 📥 Download Sample Models
+## Download Sample Models
 
-Use the `huggingface-cli` to download sample GGUF models directly into your `models/` directory.
+Use the `huggingface-cli` to download the specific Liquid Foundation Models (LFM) directly into your `models/` directory.
 
-### Example 1: Download a LLaVA-1.5 Vision/Multimodal Model
-Vision models typically require both a text model file (`.gguf`) and a clip projector file (`.gguf` or similar):
+### 1. Download Liquid LFM2.5-VL-450M-Extract GGUF & CLIP Projector
+The Stage-1 vision model is composed of a vision model file and its corresponding CLIP projector:
 
 ```bash
-# Download the main LLaVA-1.5-7B GGUF Model
-uv run huggingface-cli download mys/ggml_llava-v1.5-7b --local-dir models --include "*ggml-model-f16.gguf"
+# Download the LFM2.5-VL-450M-Extract GGUF
+uv run huggingface-cli download LiquidAI/LFM2.5-VL-450M-Extract-GGUF LFM2.5-VL-450M-Extract-Q4_0.gguf --local-dir models --local-dir-use-symlinks False
 
-# Download the corresponding CLIP Projector
-uv run huggingface-cli download mys/ggml_llava-v1.5-7b --local-dir models --include "*mmproj-model-f16.gguf"
+# Download the CLIP Projector
+uv run huggingface-cli download LiquidAI/LFM2.5-VL-450M-Extract-GGUF mmproj-LFM2.5-VL-450M-Extract-F16.gguf --local-dir models --local-dir-use-symlinks False
 ```
 
-### Example 2: Download a standard Text-only LFM / Llama GGUF
+### 2. Download Liquid LFM2.5-1.2B-JP-202606-GGUF (Japanese Text model)
+The Stage-2 Japanese synthesis model:
+
 ```bash
-# Download a lightweight text model
-uv run huggingface-cli download TheBloke/Llama-2-7B-Chat-GGUF llama-2-7b-chat.Q4_K_M.gguf --local-dir models --local-dir-use-symlinks False
+# Download the 1.2B Japanese text model
+uv run huggingface-cli download LiquidAI/LFM2.5-1.2B-JP-202606-GGUF LFM2.5-1.2B-JP-202606-Q4_0.gguf --local-dir models --local-dir-use-symlinks False
 ```
 
 ---
 
-## 🏃 Running Inference
+## Running Inference
 
 The core inference script is located at `src/infer_vision.py`.
 
@@ -201,7 +203,7 @@ uv run src/infer_vision.py \
 
 ---
 
-## 🧭 Advent One FastAPI Backend Scaffold (Stage C)
+## Advent One FastAPI Backend Scaffold (Stage C)
 
 The new Advent One backend lives under `src/advent_one/` and runs alongside the existing `src/infer_vision.py` prototype.
 
@@ -211,27 +213,43 @@ The new Advent One backend lives under `src/advent_one/` and runs alongside the 
 - Manual upload (`/extract` with file multipart) remains available and does not depend on ESP32.
 - Existing `mtmd_cli` path remains the fallback/validation harness until llama-server parity is proven.
 
-### Run Advent One backend
+### Running the Entire Advent One Stack
+
+You can launch both `llama-server` instances (the vision extraction and Japanese synthesis endpoints) along with the FastAPI backend by executing the orchestrator script:
+
+```bash
+./scripts/run_servers.sh
+```
+
+This script will:
+1. Boot the vision-extraction `llama-server` on port `8001`.
+2. Boot the Japanese text-synthesis `llama-server` on port `8002`.
+3. Wait and poll their `/health` endpoints until both are fully online.
+4. Launch the FastAPI app with `uvicorn` on port `8000`.
+5. Gracefully terminate all background server processes when you stop the command (via `Ctrl+C`).
+
+### Running the FastAPI Backend Individually
+If you want to run only the FastAPI backend (e.g. relying on the deterministic fallback if you don't run local model servers), run:
 
 ```bash
 uv run uvicorn src.advent_one.main:app --host 0.0.0.0 --port 8000
 ```
 
-### Run smoke test
+### Running the Verification Smoke Test
+With the FastAPI backend running (either individually or via the orchestrator script), run the smoke test to verify schema compliance:
 
 ```bash
-python scripts/smoke_test.py data/samples/sample_image.jpg
+uv run python scripts/smoke_test.py data/samples/sample_image.jpg
 ```
 
-Optional smoke target override:
-
+Optional target URL override:
 ```bash
-BACKEND_URL=http://localhost:8000 python scripts/smoke_test.py data/samples/sample_image.jpg
+BACKEND_URL=http://localhost:8000 uv run python scripts/smoke_test.py data/samples/sample_image.jpg
 ```
 
 ---
 
-## 📊 Logging & Metrics
+## Logging & Metrics
 
 During execution, metrics are logged locally to the terminal and forwarded to Weights & Biases (if `WANDB_API_KEY` is provided in `.env`). The logger tracks:
 - **`inference_latency_sec`**: Total duration of model evaluation.

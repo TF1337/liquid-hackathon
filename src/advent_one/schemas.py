@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Literal
+from typing import Literal, Optional
 
 from pydantic import BaseModel, Field
 
@@ -29,28 +29,25 @@ class ExtractedFact(BaseModel):
 class WorkflowNode(BaseModel):
     id: str
     label_jp: str
-    label_en: str = ""
-    role: str | None = None
+    label_en: str
+    role: Optional[str] = None
     node_type: Literal["start", "step", "decision", "external", "end"] = "step"
-    observed_signals: list[str] = Field(default_factory=list)
+    bottleneck: bool = False
+    founder_dependent: bool = False
     source_fact_ids: list[str] = Field(default_factory=list)
-    requires_human_review: bool = False
 
 
 class WorkflowEdge(BaseModel):
     source: str
     target: str
-    label: str | None = None
+    label: Optional[str] = None
 
 
 class WorkflowGraph(BaseModel):
     nodes: list[WorkflowNode] = Field(default_factory=list)
     edges: list[WorkflowEdge] = Field(default_factory=list)
-    observed_manual_or_paper_signals: list[str] = Field(default_factory=list)
-    approval_reference_count: int = 0
-    owner_or_president_mentions: int = 0
-    workflow_observations_jp: str = ""
-    workflow_observations_en: str = ""
+    bottleneck_summary_jp: str = ""
+    bottleneck_summary_en: str = ""
 
 
 class IngestionState(BaseModel):
