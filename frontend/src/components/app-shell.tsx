@@ -8,7 +8,7 @@ import { useDataSource } from "@/lib/advent-one/source";
 const NAV = [
   { to: "/", label: "Overview" },
   { to: "/capture", label: "Capture" },
-  { to: "/evidence", label: "Evidence" },
+  { to: "/evidence", label: "Records" },
   { to: "/workflow", label: "Workflow" },
 ] as const;
 

@@ -9,8 +9,8 @@ import { adaptFactToEvidence } from "@/lib/advent-one/adapters";
 export const Route = createFileRoute("/evidence")({
   head: () => ({
     meta: [
-      { title: "Advent One — Evidence" },
-      { name: "description", content: "Stage 1 evidence records extracted from Sakura Logistics site capture." },
+      { title: "Advent One — Records" },
+      { name: "description", content: "Stage 1 records extracted from Sakura Logistics site capture." },
     ],
   }),
   component: EvidenceList,
@@ -47,7 +47,7 @@ function EvidenceList() {
           <div className="flex items-end justify-between mb-12">
             <div>
               <div className="text-[10px] font-mono text-white/30 uppercase tracking-widest mb-3">
-                Stage 1 · Evidence
+                Stage 1 · Records
               </div>
               <h1 className="font-display text-4xl font-medium tracking-tight">
                 Extracted records
@@ -67,7 +67,7 @@ function EvidenceList() {
           {records.length === 0 && !showError && (
             <div className="border border-dashed border-white/15 p-12 text-center">
               <p className="text-sm text-white/60">
-                No evidence captured yet.
+                No records captured yet.
               </p>
               <Link
                 to="/capture"

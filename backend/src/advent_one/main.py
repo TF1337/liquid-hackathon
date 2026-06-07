@@ -1,6 +1,12 @@
 import os
 import time
 import json
+import threading
+try:
+    import serial  # type: ignore
+except ImportError:
+    serial = None
+
 from src.utils.logger import logger
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
@@ -47,6 +53,57 @@ LAST_GRAPH: WorkflowGraph | None = None
 
 VL_CLIENT: VLClient | None = None
 JP_CLIENT: JPClient | None = None
+
+SERIAL_THREAD: threading.Thread | None = None
+SERIAL_STOP_EVENT = threading.Event()
+
+def _serial_listener(stop_event: threading.Event):
+    port = "COM3"
+    baudrate = 115200
+    logger.info(f"🔌 Starting ESP32 serial listener on {port} at {baudrate} baud...")
+    
+    if serial is None:
+        logger.error("❌ pyserial is not installed. Serial listener cannot start. Run 'python -m uv sync'.")
+        return
+
+    ser = None
+    while not stop_event.is_set():
+        try:
+            if ser is None:
+                # Open with a short timeout so we can check the stop_event periodically
+                ser = serial.Serial(port, baudrate, timeout=1.0)
+                logger.info(f"🔌 Serial connection established on {port}")
+            
+            if ser.in_waiting > 0:
+                line = ser.readline().decode("utf-8", errors="ignore").strip()
+                if "TRIGGER_DETECTED" in line:
+                    logger.info("📡 ESP32 signal received: TRIGGER_DETECTED")
+                    # Transition state to AWAKE
+                    INGESTION_STATE.status = "AWAKE"
+                    INGESTION_STATE.last_trigger_at = _utc_now()
+        except serial.SerialException as e:
+            logger.warning(f"⚠️ Serial connection error on {port}: {e}. Retrying in 5s...")
+            if ser:
+                try:
+                    ser.close()
+                except Exception:
+                    pass
+                ser = None
+            # Wait for 5 seconds, checking stop_event every second
+            for _ in range(5):
+                if stop_event.is_set():
+                    break
+                time.sleep(1.0)
+        except Exception as e:
+            logger.error(f"❌ Unexpected error in serial listener: {e}")
+            time.sleep(1.0)
+            
+    if ser:
+        try:
+            ser.close()
+            logger.info(f"🔌 Closed serial port {port}")
+        except Exception:
+            pass
 
 
 def _utc_now() -> datetime:
@@ -242,11 +299,27 @@ async def synthesize_workflow(facts: list[ExtractedFact]) -> tuple[WorkflowGraph
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    global VL_CLIENT, JP_CLIENT
+    global VL_CLIENT, JP_CLIENT, SERIAL_THREAD
     VL_CLIENT = VLClient()
     JP_CLIENT = JPClient()
     _safe_weave_init()
+
+    # Start ESP32 USB serial listener thread
+    SERIAL_STOP_EVENT.clear()
+    SERIAL_THREAD = threading.Thread(
+        target=_serial_listener,
+        args=(SERIAL_STOP_EVENT,),
+        daemon=True
+    )
+    SERIAL_THREAD.start()
+
     yield
+
+    # Stop ESP32 USB serial listener thread
+    logger.info("🛑 Shutting down ESP32 serial listener...")
+    SERIAL_STOP_EVENT.set()
+    if SERIAL_THREAD:
+        SERIAL_THREAD.join(timeout=2.0)
 
 
 app = FastAPI(title="Advent One Backend", version="0.1.0", lifespan=lifespan)

@@ -12,13 +12,13 @@ export const Route = createFileRoute("/evidence/$id")({
   head: ({ params }) => ({
     meta: [
       { title: `RollupOS — ${params.id}` },
-      { name: "description", content: "Single Stage 1 evidence record with schema-bound JSON." },
+      { name: "description", content: "Single Stage 1 record with schema-bound JSON." },
     ],
   }),
   // No loader: we resolve mock vs live in the component to avoid SSR fetches.
   notFoundComponent: () => (
     <div className="h-full flex items-center justify-center text-sm text-white/50">
-      Evidence record not found.
+      Record not found.
     </div>
   ),
   errorComponent: ({ error, reset }) => (
@@ -57,9 +57,9 @@ function EvidenceDetail() {
     }
     return (
       <div className="h-full flex flex-col items-center justify-center gap-3">
-        <p className="text-sm text-white/60">Evidence record {id} not found.</p>
+        <p className="text-sm text-white/60">Record {id} not found.</p>
         <Link to="/evidence" className="text-xs font-mono text-brand-orange uppercase tracking-widest hover:underline">
-          ← Back to evidence
+          ← Back to records
         </Link>
       </div>
     );
@@ -72,7 +72,7 @@ function EvidenceDetail() {
         <section className="w-[56%] overflow-y-auto p-12 border-r border-white/5">
           <nav className="mb-8 flex items-center gap-2 text-xs font-mono text-white/30 uppercase tracking-widest">
             <Link to="/evidence" className="hover:text-white/60">
-              Evidence
+              Records
             </Link>
             <span>/</span>
             <span className="text-white/60">
