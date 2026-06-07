@@ -16,4 +16,5 @@ dependencies = [
     "uvicorn[standard]>=0.35.0",
     "wandb>=0.27.2",
     "weave>=0.51.40",
+    "pyserial>=3.5",
 ]
