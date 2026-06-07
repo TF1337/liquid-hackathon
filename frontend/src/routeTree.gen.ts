@@ -10,14 +10,21 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as WorkflowRouteImport } from './routes/workflow'
+import { Route as StrategyRouteImport } from './routes/strategy'
 import { Route as EvidenceRouteImport } from './routes/evidence'
 import { Route as CaptureRouteImport } from './routes/capture'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as EvidenceIndexRouteImport } from './routes/evidence.index'
 import { Route as EvidenceIdRouteImport } from './routes/evidence.$id'
 
 const WorkflowRoute = WorkflowRouteImport.update({
   id: '/workflow',
   path: '/workflow',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const StrategyRoute = StrategyRouteImport.update({
+  id: '/strategy',
+  path: '/strategy',
   getParentRoute: () => rootRouteImport,
 } as any)
 const EvidenceRoute = EvidenceRouteImport.update({
@@ -35,6 +42,11 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const EvidenceIndexRoute = EvidenceIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => EvidenceRoute,
+} as any)
 const EvidenceIdRoute = EvidenceIdRouteImport.update({
   id: '/$id',
   path: '/$id',
@@ -45,42 +57,63 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/capture': typeof CaptureRoute
   '/evidence': typeof EvidenceRouteWithChildren
+  '/strategy': typeof StrategyRoute
   '/workflow': typeof WorkflowRoute
   '/evidence/$id': typeof EvidenceIdRoute
+  '/evidence/': typeof EvidenceIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/capture': typeof CaptureRoute
-  '/evidence': typeof EvidenceRouteWithChildren
+  '/strategy': typeof StrategyRoute
   '/workflow': typeof WorkflowRoute
   '/evidence/$id': typeof EvidenceIdRoute
+  '/evidence': typeof EvidenceIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/capture': typeof CaptureRoute
   '/evidence': typeof EvidenceRouteWithChildren
+  '/strategy': typeof StrategyRoute
   '/workflow': typeof WorkflowRoute
   '/evidence/$id': typeof EvidenceIdRoute
+  '/evidence/': typeof EvidenceIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/capture' | '/evidence' | '/workflow' | '/evidence/$id'
+  fullPaths:
+    | '/'
+    | '/capture'
+    | '/evidence'
+    | '/strategy'
+    | '/workflow'
+    | '/evidence/$id'
+    | '/evidence/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/capture' | '/evidence' | '/workflow' | '/evidence/$id'
+  to:
+    | '/'
+    | '/capture'
+    | '/strategy'
+    | '/workflow'
+    | '/evidence/$id'
+    | '/evidence'
   id:
     | '__root__'
     | '/'
     | '/capture'
     | '/evidence'
+    | '/strategy'
     | '/workflow'
     | '/evidence/$id'
+    | '/evidence/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   CaptureRoute: typeof CaptureRoute
   EvidenceRoute: typeof EvidenceRouteWithChildren
+  StrategyRoute: typeof StrategyRoute
   WorkflowRoute: typeof WorkflowRoute
 }
 
@@ -91,6 +124,13 @@ declare module '@tanstack/react-router' {
       path: '/workflow'
       fullPath: '/workflow'
       preLoaderRoute: typeof WorkflowRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/strategy': {
+      id: '/strategy'
+      path: '/strategy'
+      fullPath: '/strategy'
+      preLoaderRoute: typeof StrategyRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/evidence': {
@@ -114,6 +154,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/evidence/': {
+      id: '/evidence/'
+      path: '/'
+      fullPath: '/evidence/'
+      preLoaderRoute: typeof EvidenceIndexRouteImport
+      parentRoute: typeof EvidenceRoute
+    }
     '/evidence/$id': {
       id: '/evidence/$id'
       path: '/$id'
@@ -126,10 +173,12 @@ declare module '@tanstack/react-router' {
 
 interface EvidenceRouteChildren {
   EvidenceIdRoute: typeof EvidenceIdRoute
+  EvidenceIndexRoute: typeof EvidenceIndexRoute
 }
 
 const EvidenceRouteChildren: EvidenceRouteChildren = {
   EvidenceIdRoute: EvidenceIdRoute,
+  EvidenceIndexRoute: EvidenceIndexRoute,
 }
 
 const EvidenceRouteWithChildren = EvidenceRoute._addFileChildren(
@@ -140,6 +189,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   CaptureRoute: CaptureRoute,
   EvidenceRoute: EvidenceRouteWithChildren,
+  StrategyRoute: StrategyRoute,
   WorkflowRoute: WorkflowRoute,
 }
 export const routeTree = rootRouteImport

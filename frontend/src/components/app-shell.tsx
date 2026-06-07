@@ -10,6 +10,7 @@ const NAV = [
   { to: "/capture", label: "Capture" },
   { to: "/evidence", label: "Records" },
   { to: "/workflow", label: "Workflow" },
+  { to: "/strategy", label: "Strategy" },
 ] as const;
 
 function StatusPills() {
@@ -91,14 +92,13 @@ function Header() {
         <span className="text-[10px] font-mono uppercase tracking-widest text-white/30">
           Precision Console
         </span>
-        <span className="text-white/10">·</span>
-        <div className="text-sm text-white/50">
-          Target: <span className="text-white/80">Sakura Logistics</span>
-        </div>
         {mode === "live" && (
-          <span className="text-[10px] font-mono uppercase tracking-widest text-brand-teal/70">
-            · connected
-          </span>
+          <>
+            <span className="text-white/10">·</span>
+            <span className="text-[10px] font-mono uppercase tracking-widest text-brand-teal/70">
+              connected
+            </span>
+          </>
         )}
       </div>
       <StatusPills />

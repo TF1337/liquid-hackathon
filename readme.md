@@ -252,7 +252,7 @@ Built at the **Liquid AI Hackathon Tokyo · June 2026**.
   <tr>
     <td align="center" width="200">
       <a href="https://www.liquid.ai" target="_blank">
-        <img src="https://avatars.githubusercontent.com/u/138661858?s=200&v=4" width="80" alt="Liquid AI" /><br/>
+        <img src="frontend/src/assets/liquid_logo_black.jpg" width="80" alt="Liquid AI" /><br/>
         <sub><b>Liquid AI</b></sub>
       </a><br/>
       <sub>Model provider · LFM2.5-VL & LFM2.5</sub>

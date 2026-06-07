@@ -29,9 +29,6 @@ function Index() {
   return (
     <div className="h-full overflow-y-auto">
       <div className="max-w-6xl mx-auto px-12 pt-20 pb-16">
-        <div className="text-[10px] font-mono text-white/30 uppercase tracking-widest mb-6">
-          Current target · Sakura Logistics
-        </div>
         <h1 className="font-display text-5xl md:text-6xl font-medium tracking-tight text-balance max-w-[24ch] leading-[1.05]">
           On-device acquisition modernization copilot for under-digitized SMEs.
         </h1>
