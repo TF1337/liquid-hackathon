@@ -12,6 +12,8 @@ import {
   postExtract,
   postSynthesize,
   postTrigger,
+  postSensorActive,
+  postStateStatus,
 } from "./client";
 import type { SchemaName, SynthesizeResponse, WorkflowGraph } from "./types";
 
@@ -92,6 +94,26 @@ export function useSynthesizeMutation() {
     mutationFn: () => postSynthesize(),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["graph"] });
+    },
+  });
+}
+
+export function useSensorActiveMutation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (active: boolean) => postSensorActive(active),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["state"] });
+    },
+  });
+}
+
+export function useStateStatusMutation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (status: string) => postStateStatus(status),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["state"] });
     },
   });
 }

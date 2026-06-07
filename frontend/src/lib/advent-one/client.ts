@@ -84,3 +84,17 @@ export async function getGraph(signal?: AbortSignal): Promise<WorkflowGraph | nu
     return null;
   }
 }
+
+export async function postSensorActive(active: boolean): Promise<IngestionState> {
+  const res = await fetch(`${getAdventOneUrl()}/sensor/active?active=${active}`, {
+    method: "POST",
+  });
+  return jsonOrThrow<IngestionState>(res);
+}
+
+export async function postStateStatus(status: string): Promise<IngestionState> {
+  const res = await fetch(`${getAdventOneUrl()}/state/status?status=${encodeURIComponent(status)}`, {
+    method: "POST",
+  });
+  return jsonOrThrow<IngestionState>(res);
+}

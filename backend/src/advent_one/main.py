@@ -67,21 +67,41 @@ def _serial_listener(stop_event: threading.Event):
         return
 
     ser = None
+    last_sent_active = None
     while not stop_event.is_set():
         try:
             if ser is None:
                 # Open with a short timeout so we can check the stop_event periodically
                 ser = serial.Serial(port, baudrate, timeout=1.0)
                 logger.info(f"🔌 Serial connection established on {port}")
+                INGESTION_STATE.sensor_connected = True
+                last_sent_active = None
+            
+            # Send current active status to microcontroller if it changed
+            current_active = INGESTION_STATE.sensor_active
+            if current_active != last_sent_active:
+                cmd = "ON\n" if current_active else "OFF\n"
+                ser.write(cmd.encode("utf-8"))
+                ser.flush()
+                logger.info(f"📤 Sent command to microcontroller: {cmd.strip()}")
+                last_sent_active = current_active
             
             if ser.in_waiting > 0:
                 line = ser.readline().decode("utf-8", errors="ignore").strip()
                 if "TRIGGER_DETECTED" in line:
                     logger.info("📡 ESP32 signal received: TRIGGER_DETECTED")
-                    # Transition state to AWAKE
-                    INGESTION_STATE.status = "AWAKE"
-                    INGESTION_STATE.last_trigger_at = _utc_now()
+                    # Transition state to AWAKE only if the sensor is active
+                    if INGESTION_STATE.sensor_active:
+                        INGESTION_STATE.status = "AWAKE"
+                        INGESTION_STATE.last_trigger_at = _utc_now()
+                elif "STATUS:ON" in line or line == "ON" or "STATUS_ON" in line:
+                    logger.info("📡 ESP32 signal received: SENSOR ON")
+                    INGESTION_STATE.sensor_active = True
+                elif "STATUS:OFF" in line or line == "OFF" or "STATUS_OFF" in line:
+                    logger.info("📡 ESP32 signal received: SENSOR OFF")
+                    INGESTION_STATE.sensor_active = False
         except serial.SerialException as e:
+            INGESTION_STATE.sensor_connected = False
             logger.warning(f"⚠️ Serial connection error on {port}: {e}. Retrying in 5s...")
             if ser:
                 try:
@@ -104,6 +124,8 @@ def _serial_listener(stop_event: threading.Event):
             logger.info(f"🔌 Closed serial port {port}")
         except Exception:
             pass
+        INGESTION_STATE.sensor_connected = False
+
 
 
 def _utc_now() -> datetime:
@@ -210,6 +232,32 @@ async def extract_document(image_bytes: bytes, schema_name: str) -> ExtractedFac
                 payload[field] = []
         else:
             payload[field] = []
+
+    # Preprocess line_items list
+    if "line_items" in payload:
+        val = payload["line_items"]
+        if isinstance(val, str) or val is None:
+            payload["line_items"] = []
+        elif isinstance(val, list):
+            normalized_items = []
+            for item in val:
+                if isinstance(item, dict):
+                    desc = item.get("description", "")
+                    qty = item.get("quantity")
+                    unit = item.get("unit")
+                    amt = item.get("amount")
+                    qty_str = str(qty) if qty is not None and str(qty).lower() not in ("none", "null", "") else None
+                    unit_str = str(unit) if unit is not None and str(unit).lower() not in ("none", "null", "") else None
+                    amt_str = str(amt) if amt is not None and str(amt).lower() not in ("none", "null", "") else None
+                    normalized_items.append({
+                        "description": str(desc),
+                        "quantity": qty_str,
+                        "unit": unit_str,
+                        "amount": amt_str
+                    })
+            payload["line_items"] = normalized_items
+    else:
+        payload["line_items"] = []
 
     # Preprocess document_type to ensure it matches Literal values
     valid_doc_types = {"receipt", "invoice", "fax", "whiteboard", "sticky_note", "memo", "delivery_slip", "form", "other"}
@@ -338,8 +386,15 @@ app.add_middleware(
 
 @app.get("/health")
 async def health() -> dict[str, Any]:
-    vl_ok = await VL_CLIENT.health() if VL_CLIENT else False
-    jp_ok = await JP_CLIENT.health() if JP_CLIENT else False
+    import asyncio
+    
+    async def get_vl_health():
+        return await VL_CLIENT.health() if VL_CLIENT else False
+
+    async def get_jp_health():
+        return await JP_CLIENT.health() if JP_CLIENT else False
+
+    vl_ok, jp_ok = await asyncio.gather(get_vl_health(), get_jp_health())
     return {
         "status": "ok",
         "vl_server": vl_ok,
@@ -425,6 +480,22 @@ async def synthesize() -> dict[str, Any]:
 @app.get("/state", response_model=IngestionState)
 async def get_state() -> IngestionState:
     return INGESTION_STATE
+
+
+@app.post("/sensor/active", response_model=IngestionState)
+async def set_sensor_active(active: bool) -> IngestionState:
+    INGESTION_STATE.sensor_active = active
+    logger.info(f"🔄 Sensor active state set via API to: {active}")
+    return INGESTION_STATE
+
+
+@app.post("/state/status", response_model=IngestionState)
+async def set_state_status(status: str) -> IngestionState:
+    if status in ("SLEEP", "AWAKE", "PROCESSING", "READY"):
+        INGESTION_STATE.status = status  # type: ignore
+        logger.info(f"🔄 Ingestion status set via API to: {status}")
+    return INGESTION_STATE
+
 
 
 @app.get("/facts")

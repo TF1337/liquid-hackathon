@@ -182,12 +182,12 @@ function StrategyPage() {
                   M&amp;A Post-Acquisition Remediation Strategy
                 </h3>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-xs text-white/70 leading-relaxed">
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 text-xs text-white/70 leading-relaxed">
                 <div>
                   <h4 className="font-bold text-white mb-2 uppercase tracking-wide">
                     1. Eliminating Key-Person Gateways
                   </h4>
-                  <p className="text-white/50 mb-3">
+                  <p className="text-white/50 mb-4">
                     Deploy local tablet clients with standard schemas to loading dock personnel. Re-route verbal confirmations into automated Slack/Teams Webhooks directly validating vendor amounts against matching PO documents.
                   </p>
                   <h4 className="font-bold text-white mb-2 uppercase tracking-wide">
@@ -201,18 +201,47 @@ function StrategyPage() {
                   <h4 className="font-bold text-white mb-2 uppercase tracking-wide">
                     3. Estimated Valuation Multiplier Impact
                   </h4>
-                  <ul className="space-y-2 text-white/50">
-                    <li className="flex items-center justify-between border-b border-white/5 pb-1.5">
+                  <ul className="space-y-3 text-white/50 mb-6">
+                    <li className="flex items-center justify-between border-b border-white/5 pb-2">
                       <span>Operational Hand-off Latency</span>
-                      <span className="text-brand-teal font-mono">Reduced 97%</span>
+                      <span className="text-brand-teal font-mono font-medium">Reduced 97%</span>
                     </li>
-                    <li className="flex items-center justify-between border-b border-white/5 pb-1.5">
+                    <li className="flex items-center justify-between border-b border-white/5 pb-2">
                       <span>Diligence Audit Trail Quality</span>
-                      <span className="text-brand-teal font-mono">100% Grounded</span>
+                      <span className="text-brand-teal font-mono font-medium">100% Grounded</span>
                     </li>
                     <li className="flex items-center justify-between">
                       <span>Valuation Risk Discount (Post-Cleanup)</span>
-                      <span className="text-brand-teal font-mono">Cleared (0%)</span>
+                      <span className="text-brand-teal font-mono font-medium">Cleared (0%)</span>
+                    </li>
+                  </ul>
+                </div>
+                <div>
+                  <h4 className="font-bold text-white mb-2 uppercase tracking-wide">
+                    4. Post-Modernization worth &amp; Valuation
+                  </h4>
+                  <ul className="space-y-3 text-white/50">
+                    <li className="border-b border-white/5 pb-2">
+                      <div className="flex items-center justify-between mb-1">
+                        <span>Pre-Acquisition (Analog)</span>
+                        <span className="text-red-400 font-mono font-medium">¥350M</span>
+                      </div>
+                      <p className="text-[10px] text-white/30 leading-normal">
+                        Valued at 4.0x EBITDA due to owner-dependencies, unstructured paper logs, and high transaction latency.
+                      </p>
+                    </li>
+                    <li className="border-b border-white/5 pb-2">
+                      <div className="flex items-center justify-between mb-1">
+                        <span>Post-Acquisition (Digitalized)</span>
+                        <span className="text-brand-teal font-mono font-medium">¥525M</span>
+                      </div>
+                      <p className="text-[10px] text-brand-teal/50 leading-normal">
+                        Valued at 6.0x EBITDA by implementing on-device vision ingestion, resolving the key-person discount.
+                      </p>
+                    </li>
+                    <li className="flex items-center justify-between pt-1">
+                      <span className="font-semibold text-white/80">Valuation Expansion</span>
+                      <span className="text-brand-orange font-mono font-bold">+¥175M (+50%)</span>
                     </li>
                   </ul>
                 </div>

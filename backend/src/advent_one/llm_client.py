@@ -47,7 +47,7 @@ class VLClient:
     async def health(self) -> bool:
         url = f"{self.base_url}/health"
         try:
-            async with httpx.AsyncClient(timeout=5.0) as client:
+            async with httpx.AsyncClient(timeout=1.0) as client:
                 response = await client.get(url)
             return response.is_success
         except httpx.HTTPError:
@@ -111,7 +111,7 @@ class JPClient:
     async def health(self) -> bool:
         url = f"{self.base_url}/health"
         try:
-            async with httpx.AsyncClient(timeout=5.0) as client:
+            async with httpx.AsyncClient(timeout=1.0) as client:
                 response = await client.get(url)
             return response.is_success
         except httpx.HTTPError:

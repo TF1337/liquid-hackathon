@@ -21,7 +21,7 @@ export function BackendErrorBanner({
   const { forceMock } = useDataSource();
   const friendly =
     status === 503
-      ? "Backend / model server unavailable. Mock demo still available."
+      ? "Backend / model server unavailable. Demo mode still available."
       : message;
   return (
     <div className="bg-brand-amber/10 border border-brand-amber/30 text-brand-amber px-4 py-3 flex items-center justify-between gap-4">
@@ -36,7 +36,7 @@ export function BackendErrorBanner({
         onClick={forceMock}
         className="text-[10px] font-mono uppercase tracking-widest border border-brand-amber/40 px-3 py-1.5 hover:bg-brand-amber/10 cursor-pointer"
       >
-        Switch to mock demo →
+        Switch to demo mode →
       </button>
     </div>
   );

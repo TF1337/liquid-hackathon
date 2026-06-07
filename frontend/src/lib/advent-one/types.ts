@@ -11,6 +11,13 @@ export type BackendDocumentType =
   | "form"
   | "other";
 
+export type LineItem = {
+  description: string;
+  quantity: string | null;
+  unit: string | null;
+  amount: string | null;
+};
+
 export type ExtractedFact = {
   id?: string | null;
   document_type: BackendDocumentType;
@@ -21,6 +28,7 @@ export type ExtractedFact = {
   counterparties: string[];
   summary_jp: string;
   captured_at?: string | null;
+  line_items?: LineItem[];
 };
 
 export type WorkflowNode = {
@@ -53,6 +61,8 @@ export type IngestionState = {
   status: IngestionStatus;
   last_trigger_at: string | null;
   captured_count: number;
+  sensor_connected: boolean;
+  sensor_active: boolean;
 };
 
 export type HealthResponse = {
