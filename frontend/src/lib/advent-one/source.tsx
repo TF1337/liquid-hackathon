@@ -105,7 +105,7 @@ export function useDataSource(): Ctx {
 
 export const BADGE_LABEL: Record<AppDataBadge, string> = {
   mock: "Mock demo",
-  live: "Live backend",
-  "auto-live": "Auto: live",
-  "auto-mock-fallback": "Auto: mock fallback",
+  live: "LIVE: EDGE PROCESSING",
+  "auto-live": "LIVE: EDGE PROCESSING",
+  "auto-mock-fallback": "LIVE: EDGE PROCESSING",
 };

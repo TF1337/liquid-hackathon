@@ -171,9 +171,11 @@ function WorkflowPage() {
                       onClick={() => setActiveId(n.id)}
                       className={cn(
                         "flex-1 text-left border p-5 transition-colors cursor-pointer group",
-                        isActive
-                          ? "border-brand-orange/60 bg-brand-orange/5"
-                          : "border-white/10 bg-panel hover:border-white/25",
+                        isActive && needsReview
+                          ? "border-red-500 bg-red-950/20 animate-pulse"
+                          : isActive
+                            ? "border-brand-orange/60 bg-brand-orange/5"
+                            : "border-white/10 bg-panel hover:border-white/25",
                       )}
                     >
                       <div className="flex items-start justify-between gap-6">
@@ -183,8 +185,13 @@ function WorkflowPage() {
                         </div>
                         <div className="flex items-center gap-2">
                           {needsReview && (
-                            <span className="text-[10px] font-mono px-1.5 py-0.5 border border-brand-amber/40 text-brand-amber uppercase tracking-wider whitespace-nowrap">
-                              requires human review
+                            <span className={cn(
+                              "text-[10px] font-mono px-1.5 py-0.5 border uppercase tracking-wider whitespace-nowrap",
+                              isActive
+                                ? "border-red-500 text-red-500 bg-red-500/10 font-bold animate-pulse"
+                                : "border-brand-amber/40 text-brand-amber"
+                            )}>
+                              {isActive ? "⚠️ URGENT: Deal Risk" : "requires human review"}
                             </span>
                           )}
                           <div className="text-[10px] font-mono text-white/30 uppercase tracking-widest whitespace-nowrap">
@@ -220,7 +227,7 @@ function WorkflowPage() {
           <div className="text-[10px] font-mono text-white/30 uppercase tracking-widest mb-3">
             Aggregation
           </div>
-          <h2 className="font-display text-2xl font-medium mb-1">{w.target}</h2>
+          <h2 className="font-display text-2xl font-medium mb-1">Diligence Target</h2>
           <div className="text-xs text-white/40 mb-8 font-mono">
             {w.record_count} record{w.record_count === 1 ? "" : "s"} aggregated
           </div>
@@ -297,10 +304,22 @@ function WorkflowPage() {
           )}
 
           {active && (
-            <section>
-              <div className="text-[10px] font-mono text-brand-teal uppercase tracking-widest mb-3">
-                {active.label} · contributing evidence
-              </div>
+            <>
+              {requiresReviewSet.has(active.id) && (
+                <div className="mb-6 p-4 border border-red-500/50 bg-red-950/20 text-red-200 rounded">
+                  <div className="text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 mb-1.5">
+                    <span>⚠️ URGENT: Deal Risk Detected</span>
+                  </div>
+                  <p className="text-[11px] leading-relaxed text-red-200/80">
+                    This step relies entirely on manual/verbal approval from the founder. It represents a major operational key-person bottleneck that threatens the stability and transferability of the business.
+                  </p>
+                </div>
+              )}
+              
+              <section>
+                <div className="text-[10px] font-mono text-brand-teal uppercase tracking-widest mb-3">
+                  {active.label} · contributing evidence
+                </div>
               <ul className="space-y-2">
                 {active.evidenceIds.map((eid) => {
                   const e = lookupEvidence(eid);
@@ -322,8 +341,9 @@ function WorkflowPage() {
                 })}
               </ul>
             </section>
-          )}
-        </aside>
+          </>
+        )}
+      </aside>
       </div>
       <StageBoundaryBanner />
       <TelemetryStrip

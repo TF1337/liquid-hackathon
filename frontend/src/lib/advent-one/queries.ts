@@ -53,7 +53,11 @@ export function useLiveGraph(enabled: boolean) {
 }
 
 export function useLiveState(enabled: boolean) {
-  return useQuery({ ...stateQueryOptions(), enabled });
+  return useQuery({
+    ...stateQueryOptions(),
+    enabled,
+    refetchInterval: enabled ? 500 : false,
+  });
 }
 
 export function useLiveHealth(enabled: boolean) {

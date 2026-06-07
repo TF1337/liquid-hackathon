@@ -6,7 +6,7 @@ import { useDataSource } from "@/lib/advent-one/source";
 import { useLiveFacts } from "@/lib/advent-one/queries";
 import { adaptFactToEvidence } from "@/lib/advent-one/adapters";
 
-export const Route = createFileRoute("/evidence")({
+export const Route = createFileRoute("/evidence/")({
   head: () => ({
     meta: [
       { title: "Advent One — Records" },
@@ -59,7 +59,7 @@ function EvidenceList() {
               </p>
             </div>
             <div className="text-[10px] font-mono text-white/40 uppercase tracking-widest">
-              {records.length} records · target: Sakura Logistics
+              {records.length} records
               {isLive && <span className="ml-2 text-brand-teal">· live</span>}
             </div>
           </div>
