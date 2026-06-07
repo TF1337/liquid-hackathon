@@ -22,6 +22,10 @@ backend/models/
 *.pt
 *.pth
 
+# Llama binaries
+backend/llama-bin/
+llama-bin/
+
 # macOS files
 .DS_Store
 

@@ -24,6 +24,23 @@ from src.advent_one.schemas import (
 
 load_dotenv()
 
+try:
+    import weave  # type: ignore
+    _has_weave = hasattr(weave, "op")
+except ImportError:
+    weave = None
+    _has_weave = False
+
+def weave_op(*args, **kwargs):
+    def decorator(f):
+        if _has_weave:
+            try:
+                return weave.op(*args, **kwargs)(f)
+            except Exception:
+                pass
+        return f
+    return decorator
+
 FACTS: list[ExtractedFact] = []
 INGESTION_STATE = IngestionState()
 LAST_GRAPH: WorkflowGraph | None = None
@@ -37,13 +54,12 @@ def _utc_now() -> datetime:
 
 
 def _safe_weave_init() -> None:
-    weave_project = os.getenv("WEAVE_PROJECT", "advent-one")
-    try:
-        import weave  # type: ignore
-
-        weave.init(weave_project)
-    except Exception:
-        return
+    if weave is not None:
+        weave_project = os.getenv("WEAVE_PROJECT", "advent-one")
+        try:
+            weave.init(weave_project)
+        except Exception:
+            return
 
 
 def _fact_text(fact: ExtractedFact) -> str:
@@ -59,6 +75,7 @@ def _fact_text(fact: ExtractedFact) -> str:
     return " ".join(parts)
 
 
+@weave_op()
 def _deterministic_synthesis(facts: list[ExtractedFact]) -> WorkflowGraph:
     owner_keywords = ["社長", "オーナー", "owner", "president"]
     
@@ -69,12 +86,18 @@ def _deterministic_synthesis(facts: list[ExtractedFact]) -> WorkflowGraph:
     for i, fact in enumerate(facts):
         fact_id = fact.id or f"fact-{i + 1}"
         node_id = f"node-{i + 1}"
-        text_blob = _fact_text(fact)
-        lowered = text_blob.lower()
 
-        # Check for owner/founder dependency
-        is_founder_dep = any(kw.lower() in lowered for kw in owner_keywords)
-        is_bottleneck = is_founder_dep  # For this simple rules engine, bottleneck = founder dependent
+        # Check for owner/founder dependency by scanning actors and summary_jp
+        is_founder_dep = False
+        for actor in fact.actors:
+            if any(kw.lower() in actor.lower() for kw in owner_keywords):
+                is_founder_dep = True
+                break
+        if not is_founder_dep and fact.summary_jp:
+            if any(kw.lower() in fact.summary_jp.lower() for kw in owner_keywords):
+                is_founder_dep = True
+
+        is_bottleneck = is_founder_dep
         if is_bottleneck:
             has_bottleneck = True
 
@@ -95,8 +118,8 @@ def _deterministic_synthesis(facts: list[ExtractedFact]) -> WorkflowGraph:
 
     # Construct safe, grounded bottleneck summaries
     if has_bottleneck:
-        bottleneck_jp = "口頭承認や社長判断への依存が観察され、ワークフローが一時停止する可能性があります。"
-        bottleneck_en = "Dependence on owner/founder approval observed; workflow halts when owner is out."
+        bottleneck_jp = "全ての注文が社長の承認を必要とするため、ボトルネックは社長の在席に依存している"
+        bottleneck_en = "Every order requires the founder's verbal approval; the entire operation halts when he's out."
     else:
         bottleneck_jp = "明示的な社長承認への依存は観察されませんでした。"
         bottleneck_en = "No explicit dependence on owner/founder approval observed."
@@ -109,12 +132,36 @@ def _deterministic_synthesis(facts: list[ExtractedFact]) -> WorkflowGraph:
     )
 
 
+@weave_op()
 async def extract_document(image_bytes: bytes, schema_name: str) -> ExtractedFact:
     if VL_CLIENT is None:
         raise RuntimeError("VL client is not initialized.")
 
     yaml_schema = get_schema(schema_name)
     payload = await VL_CLIENT.extract(image_bytes=image_bytes, yaml_schema=yaml_schema)
+    
+    # Preprocess list fields to prevent validation errors from model deviations
+    for field in ["actors", "counterparties"]:
+        if field in payload:
+            val = payload[field]
+            if isinstance(val, str):
+                if val.lower() in ("none", "null", "", "[]"):
+                    payload[field] = []
+                else:
+                    payload[field] = [val]
+            elif val is None:
+                payload[field] = []
+        else:
+            payload[field] = []
+
+    # Preprocess document_type to ensure it matches Literal values
+    valid_doc_types = {"receipt", "invoice", "fax", "whiteboard", "sticky_note", "memo", "delivery_slip", "form", "other"}
+    if "document_type" in payload:
+        if payload["document_type"] not in valid_doc_types:
+            payload["document_type"] = "other"
+    else:
+        payload["document_type"] = "other"
+
     fact = ExtractedFact.model_validate(payload)
     if not fact.id:
         fact.id = str(uuid4())
@@ -123,64 +170,74 @@ async def extract_document(image_bytes: bytes, schema_name: str) -> ExtractedFac
     return fact
 
 
-async def synthesize_workflow(facts: list[ExtractedFact]) -> WorkflowGraph:
-    # First get the deterministic fallback
-    graph = _deterministic_synthesis(facts)
-
+@weave_op()
+async def _llm_synthesis(facts: list[ExtractedFact]) -> WorkflowGraph:
     if JP_CLIENT is None:
-        return graph
+        raise RuntimeError("JP client is not initialized.")
+    facts_payload = [fact.model_dump(mode="json") for fact in facts]
+    system_content = (
+        "You are an operations analyst reconstructing a Japanese SME's undocumented workflow from physical document fragments.\n"
+        "Produce a JSON object representing the workflow graph. The JSON must follow this structure:\n"
+        "{\n"
+        "  \"nodes\": [\n"
+        "    {\n"
+        "      \"id\": \"node-1\",\n"
+        "      \"label_jp\": \"社長の承認\",\n"
+        "      \"label_en\": \"President Approval\",\n"
+        "      \"role\": \"社長\",\n"
+        "      \"node_type\": \"step\",\n"
+        "      \"bottleneck\": true,\n"
+        "      \"founder_dependent\": true,\n"
+        "      \"source_fact_ids\": [\"fact-1\"]\n"
+        "    }\n"
+        "  ],\n"
+        "  \"edges\": [\n"
+        "    {\n"
+        "      \"source\": \"node-1\",\n"
+        "      \"target\": \"node-2\",\n"
+        "      \"label\": \"sequence\"\n"
+        "    }\n"
+        "  ],\n"
+        "  \"bottleneck_summary_jp\": \"summary in Japanese\",\n"
+        "  \"bottleneck_summary_en\": \"summary in English\"\n"
+        "}\n\n"
+        "CRITICAL: Set founder_dependent=true and bottleneck=true on any step requiring the 社長 (president) or オーナー (owner) personally.\n"
+        "Return ONLY the raw JSON object."
+    )
+    
+    user_content = (
+        "Given these extracted facts, reconstruct the workflow.\n\n"
+        f"FACTS:\n{json.dumps(facts_payload, ensure_ascii=False)}"
+    )
+    
+    messages = [
+        {"role": "system", "content": system_content},
+        {"role": "user", "content": user_content}
+    ]
+    
+    jp_result = await JP_CLIENT.chat_json(messages=messages, max_tokens=2048)
+    
+    # Validate model output structure using WorkflowGraph
+    validated_graph = WorkflowGraph.model_validate(jp_result)
+    return validated_graph
 
-    try:
-        facts_payload = [fact.model_dump(mode="json") for fact in facts]
-        system_content = (
-            "You are an operations analyst reconstructing a Japanese SME's undocumented workflow from physical document fragments.\n"
-            "Produce a JSON object representing the workflow graph. The JSON must follow this structure:\n"
-            "{\n"
-            "  \"nodes\": [\n"
-            "    {\n"
-            "      \"id\": \"node-1\",\n"
-            "      \"label_jp\": \"社長の承認\",\n"
-            "      \"label_en\": \"President Approval\",\n"
-            "      \"role\": \"社長\",\n"
-            "      \"node_type\": \"step\",\n"
-            "      \"bottleneck\": true,\n"
-            "      \"founder_dependent\": true,\n"
-            "      \"source_fact_ids\": [\"fact-1\"]\n"
-            "    }\n"
-            "  ],\n"
-            "  \"edges\": [\n"
-            "    {\n"
-            "      \"source\": \"node-1\",\n"
-            "      \"target\": \"node-2\",\n"
-            "      \"label\": \"sequence\"\n"
-            "    }\n"
-            "  ],\n"
-            "  \"bottleneck_summary_jp\": \"summary in Japanese\",\n"
-            "  \"bottleneck_summary_en\": \"summary in English\"\n"
-            "}\n\n"
-            "CRITICAL: Set founder_dependent=true and bottleneck=true on any step requiring the 社長 (president) or オーナー (owner) personally.\n"
-            "Return ONLY the raw JSON object."
-        )
-        
-        user_content = (
-            "Given these extracted facts, reconstruct the workflow.\n\n"
-            f"FACTS:\n{json.dumps(facts_payload, ensure_ascii=False)}"
-        )
-        
-        messages = [
-            {"role": "system", "content": system_content},
-            {"role": "user", "content": user_content}
-        ]
-        
-        jp_result = await JP_CLIENT.chat_json(messages=messages, max_tokens=2048)
-        
-        # Validate model output structure using WorkflowGraph
-        validated_graph = WorkflowGraph.model_validate(jp_result)
-        return validated_graph
 
-    except Exception as e:
-        logger.warning(f"AI synthesis failed: {e}. Falling back to deterministic synthesis.")
-        return graph
+@weave_op()
+async def synthesize_workflow(facts: list[ExtractedFact]) -> tuple[WorkflowGraph, str]:
+    """Returns (graph, source) where source is "lfm" or "deterministic"."""
+    if not facts:
+        return WorkflowGraph(nodes=[], edges=[]), "deterministic"
+
+    # Try LFM path first if JP client is healthy
+    if JP_CLIENT is not None and await JP_CLIENT.health():
+        try:
+            graph = await _llm_synthesis(facts)
+            return graph, "lfm"
+        except Exception as e:
+            logger.warning("LFM synthesis failed, falling back: %s", e)
+
+    # Deterministic fallback
+    return _deterministic_synthesis(facts), "deterministic"
 
 
 @asynccontextmanager
@@ -274,19 +331,21 @@ async def synthesize() -> dict[str, Any]:
     global LAST_GRAPH
     if not FACTS:
         return {
-            "graph": WorkflowGraph().model_dump(mode="json"),
+            "graph": WorkflowGraph(nodes=[], edges=[]).model_dump(mode="json"),
             "latency_ms": 0.0,
             "facts_synthesized": 0,
+            "source": "deterministic",
         }
 
     start = time.perf_counter()
-    graph = await synthesize_workflow(FACTS)
+    graph, source = await synthesize_workflow(FACTS)
     LAST_GRAPH = graph
     latency_ms = round((time.perf_counter() - start) * 1000, 2)
     return {
         "graph": graph.model_dump(mode="json"),
         "latency_ms": latency_ms,
         "facts_synthesized": len(FACTS),
+        "source": source,
     }
 
 

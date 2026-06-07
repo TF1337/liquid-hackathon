@@ -52,7 +52,9 @@ def main() -> int:
 
             synthesize = client.post(f"{backend_url}/synthesize")
             synthesize.raise_for_status()
-            pretty("synthesize", synthesize.json())
+            synth_data = synthesize.json()
+            pretty("synthesize", synth_data)
+            print(f"Synthesis source: {synth_data.get('source')}")
 
             facts = client.get(f"{backend_url}/facts")
             facts.raise_for_status()
@@ -69,7 +71,7 @@ def main() -> int:
             print(traceback.format_exc())
             raise
 
-    print("\nSmoke test completed successfully.")
+    print("\n🟢 end-to-end pipeline OK")
     return 0
 
 

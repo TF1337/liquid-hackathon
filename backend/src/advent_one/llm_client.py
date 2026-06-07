@@ -59,16 +59,14 @@ class VLClient:
         messages = [
             {
                 "role": "system",
-                "content": (
-                    "You are a strict document extraction assistant. Extract visibly present information into the requested JSON schema. Do not infer business conclusions."
-                ),
+                "content": yaml_schema,
             },
             {
                 "role": "user",
                 "content": [
                     {
                         "type": "text",
-                        "text": "Extract the visible facts from the image into the JSON schema.",
+                        "text": "Extract per the schema.",
                     },
                     {
                         "type": "image_url",
@@ -83,7 +81,6 @@ class VLClient:
         body = {
             "model": self.model_id,
             "messages": messages,
-            "max_tokens": 1024,
             "response_format": {
                 "type": "json_object",
                 "schema": schema_dict,
