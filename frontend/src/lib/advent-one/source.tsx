@@ -43,7 +43,7 @@ export function DataSourceProvider({ children }: { children: ReactNode }) {
     let cancelled = false;
     setProbing(true);
     const controller = new AbortController();
-    const timeout = window.setTimeout(() => controller.abort(), 2000);
+    const timeout = window.setTimeout(() => controller.abort(), 10000);
     getHealth(controller.signal)
       .then(() => {
         if (!cancelled) setAutoLive(true);
@@ -104,8 +104,8 @@ export function useDataSource(): Ctx {
 }
 
 export const BADGE_LABEL: Record<AppDataBadge, string> = {
-  mock: "Mock demo",
+  mock: "Demo mode",
   live: "LIVE: EDGE PROCESSING",
   "auto-live": "LIVE: EDGE PROCESSING",
-  "auto-mock-fallback": "LIVE: EDGE PROCESSING",
+  "auto-mock-fallback": "Demo mode (offline fallback)",
 };

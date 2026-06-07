@@ -54,7 +54,7 @@ export function DataSourceBadge() {
                 disabled={mode === "mock" && configured !== "live"}
                 className="text-left text-xs px-3 py-2 border border-white/15 hover:border-white/30 hover:text-white text-white/80 transition-colors disabled:opacity-40 cursor-pointer"
               >
-                Switch to mock demo
+                Switch to demo mode
               </button>
               <button
                 onClick={() => {
@@ -67,7 +67,7 @@ export function DataSourceBadge() {
               </button>
             </div>
             <p className="mt-3 text-[10px] font-mono text-white/30 leading-relaxed">
-              The mock demo always works without the Python backend.
+              The demo mode always works without the Python backend.
             </p>
           </div>
         </>

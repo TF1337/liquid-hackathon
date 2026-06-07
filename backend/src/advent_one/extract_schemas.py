@@ -7,6 +7,7 @@ required:
   - amount
   - counterparties
   - summary_jp
+  - line_items
 properties:
   document_type:
     type: string
@@ -31,6 +32,25 @@ properties:
     maxItems: 10
   summary_jp:
     type: string
+  line_items:
+    type: array
+    items:
+      type: object
+      required:
+        - description
+        - quantity
+        - unit
+        - amount
+      properties:
+        description:
+          type: string
+        quantity:
+          type: [string, "null"]
+        unit:
+          type: [string, "null"]
+        amount:
+          type: [string, "null"]
+      additionalProperties: false
 additionalProperties: false
 """
 

@@ -4,6 +4,13 @@ from typing import Literal, Optional
 from pydantic import BaseModel, Field
 
 
+class LineItem(BaseModel):
+    description: str = ""
+    quantity: str | None = None
+    unit: str | None = None
+    amount: str | None = None
+
+
 class ExtractedFact(BaseModel):
     document_type: Literal[
         "receipt",
@@ -24,6 +31,7 @@ class ExtractedFact(BaseModel):
     summary_jp: str = ""
     id: str | None = None
     captured_at: datetime | None = None
+    line_items: list[LineItem] = Field(default_factory=list)
 
 
 class WorkflowNode(BaseModel):
@@ -54,6 +62,9 @@ class IngestionState(BaseModel):
     status: Literal["SLEEP", "AWAKE", "PROCESSING", "READY"] = "SLEEP"
     last_trigger_at: datetime | None = None
     captured_count: int = 0
+    sensor_connected: bool = False
+    sensor_active: bool = False
+
 
 
 class TriggerEvent(BaseModel):

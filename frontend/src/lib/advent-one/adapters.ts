@@ -36,7 +36,7 @@ export function adaptFactToEvidence(
     document_type: fact.document_type,
     language: "ja",
     fields,
-    line_items: [], // never fabricated
+    line_items: fact.line_items || [],
     unreadable_text: [], // never fabricated
   };
 
